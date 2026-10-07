@@ -65,7 +65,11 @@ namespace DeskBuddy {
    Theme.Fill(e.Graphics,ControlPaint.Dark(fill,.08f),4,Height-10,Width-8,3);
    int offset=String.IsNullOrEmpty(IconId)?0:32;
    if(offset>0)PixelIcons.Draw(e.Graphics,IconId,new Point(14,Height/2-10),2);
-   Theme.Text(e.Graphics,Text,Font,Enabled?ForeColor:Theme.Muted,new Rectangle(offset+5,pressed?3:0,Width-offset-10,Height-5),ContentAlignment.MiddleCenter);
+   e.Graphics.TextRenderingHint=TextRenderingHint.SingleBitPerPixelGridFit;
+   using(var b=new SolidBrush(Enabled?ForeColor:Theme.Muted))
+   using(var sf=new StringFormat{Alignment=StringAlignment.Center,LineAlignment=StringAlignment.Center,FormatFlags=StringFormatFlags.NoWrap,Trimming=StringTrimming.EllipsisCharacter}){
+    e.Graphics.DrawString(Text,Font,b,new Rectangle(offset+4,pressed?3:0,Width-offset-8,Height-5),sf);
+   }
    if(Focused){using(var p=new Pen(ForeColor)){p.DashStyle=DashStyle.Dot;e.Graphics.DrawRectangle(p,8,7,Width-17,Height-17);}}
   }
  }
@@ -85,6 +89,7 @@ namespace DeskBuddy {
   static Dictionary<string,string[]> art=new Dictionary<string,string[]>{
    {"home",new[]{"0000110000","0001111000","0011111100","0111111110","1111111111","0011111100","0011001100","0011001100","0011001100","0011111100"}},
    {"quest",new[]{"0111111110","0110000110","0111111110","0100000010","0110111010","0100000010","0110111010","0100000010","0111111110","0000000000"}},
+   {"diary",new[]{"0111111110","1100000011","1011111101","1010000001","1011111101","1010000001","1011111101","1010000001","1100000011","0111111110"}},
    {"focus",new[]{"0001111000","0011001100","0110000110","0100100010","1100100011","1100111011","0100000010","0110000110","0011001100","0001111000"}},
    {"star",new[]{"0000110000","0000110000","0001111000","1111111111","0111111110","0011111100","0011111100","0111001110","0110000110","0100000010"}},
    {"shop",new[]{"0111111110","1111111111","1101101101","1101101101","0111111110","0100000010","0101110010","0101010010","0101010010","0111111110"}},
@@ -187,10 +192,10 @@ namespace DeskBuddy {
    sidebar=new PixelPanel{Location=new Point(12, 70),Size=new Size(212,636),BackColor=Color.FromArgb(237,222,190)};Controls.Add(sidebar);
    sidebar.Controls.Add(new PetPortrait{Location=new Point(16,14),Size=new Size(180,104),BackColor=Theme.Cream});
    friend=Theme.Label(Store.State.PetName,16,124,180,26,11);friend.TextAlign=ContentAlignment.MiddleCenter;sidebar.Controls.Add(friend);
-   string[] pages={"나의 방","오늘의 업무","집중 스튜디오","미니게임","코인 상점","나의 캐릭터","펫 키우기","설정 / 소개"};
-   string[] names={"나의 방","퀘스트 보드","집중 모험","미니게임","아이템 상점","캐릭터","펫 키우기","옵션"};
-   string[] icons={"home","quest","focus","star","shop","pet","pet","options"};
-   for(int i=0;i<pages.Length;i++){string target=pages[i];var b=(PixelButton)Theme.Button(names[i],16,171+i*45,180,42,(s,e)=>Navigate(target));b.IconId=icons[i];sidebar.Controls.Add(b);nav[target]=b;}
+   string[] pages={"나의 방","오늘의 업무","업무일지","집중 스튜디오","미니게임","코인 상점","나의 캐릭터","펫 키우기","설정 / 소개"};
+   string[] names={"나의 방","퀘스트 보드","업무일지","집중 모험","미니게임","아이템 상점","캐릭터","펫 키우기","옵션"};
+   string[] icons={"home","quest","diary","focus","star","shop","pet","pet","options"};
+   for(int i=0;i<pages.Length;i++){string target=pages[i];var b=(PixelButton)Theme.Button(names[i],16,160+i*40,180,36,(s,e)=>Navigate(target));b.IconId=icons[i];sidebar.Controls.Add(b);nav[target]=b;}
    sidebar.Controls.Add(Theme.Label("SAVE FILE  01",20,546,176,24,10,Theme.Muted));sidebar.Controls.Add(Theme.Label("일정 완료  +20 G\n집중 1분    +1 G",20,576,178, 40,10,Theme.Muted));
    wallet=Theme.Label("",244, 70,752,36,11);Controls.Add(wallet);
    content=new Panel{Location=new Point(244,119),Size=new Size(752,588),BackColor=Theme.Bg,AutoScroll=true};Controls.Add(content);
@@ -214,7 +219,7 @@ namespace DeskBuddy {
    int xp=Companions.Experience(Store.State);wallet.Text="Lv."+(1+xp/100)+"  "+Store.State.PetName+(Companions.Level(Store.State)>=10?" · 전설의 친구":"")+"      GOLD "+Store.State.Coins.ToString("0000")+" G";
    foreach(var pair in nav){pair.Value.BackColor=pair.Key==page?Theme.Gold:Theme.Cream;pair.Value.Invalidate();}
    foreach(Control c in sidebar.Controls)if(c is PetPortrait)c.Invalidate();
-   if(page=="나의 방")Home();else if(page=="오늘의 업무")Tasks();else if(page=="집중 스튜디오")FocusPage();else if(page=="미니게임")Game();else if(page=="코인 상점")Shop();else if(page=="나의 캐릭터")Character();else if(page=="펫 키우기"){Title("LITTLE PET / FROM AN EGG","우리 친구의 작은 펫","레벨 2부터 알을 입양해 함께 돌봐주세요.");CompanionPanel();}else Settings();
+   if(page=="나의 방")Home();else if(page=="오늘의 업무")Tasks();else if(page=="업무일지")Add(new WorkDiaryPanel(this,pet));else if(page=="집중 스튜디오")FocusPage();else if(page=="미니게임")Game();else if(page=="코인 상점")Shop();else if(page=="나의 캐릭터")Character();else if(page=="펫 키우기"){Title("LITTLE PET / FROM AN EGG","우리 친구의 작은 펫","레벨 2부터 알을 입양해 함께 돌봐주세요.");CompanionPanel();}else Settings();
   }
   void Home(){
    Title("HOME / SAVE FILE 01",Store.State.PetName+"의 작은 방","오늘의 일도, 잠깐의 휴식도. 여기서 함께 시작해요.");

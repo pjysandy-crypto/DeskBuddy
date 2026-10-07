@@ -33,6 +33,7 @@ namespace DeskBuddy {
   public int Coins=30, Completed, FocusCount, FocusMinutes,ExperienceAdjustment;
   public string PetName="스누피", ImagePath="", Equipped="기본"; public int PixelSize=3; public int PetSize=140; public int BubbleScale=100; public Dictionary<string,LittlePet> Companions=new Dictionary<string,LittlePet>();
   public List<string> Owned=new List<string>{"기본"}; public List<TaskItem> Tasks=new List<TaskItem>();
+  public List<ProjectItem> Projects=new List<ProjectItem>(); public List<WorkDiaryItem> Diaries=new List<WorkDiaryItem>();
   public bool Wander=true, Quiet=false; public bool Cartwheels=true; public List<string> CharacterSamples=new List<string>(); public DateTime FocusEnd=DateTime.MinValue; public string FocusEndLocal=""; public int SessionMinutes; public string GamesDate=""; public int GamesPlayed;
  }
  public static class Store {
@@ -42,7 +43,7 @@ namespace DeskBuddy {
    if(!File.Exists(FilePath))return;
    try { State=new JavaScriptSerializer().Deserialize<Data>(File.ReadAllText(FilePath,Encoding.UTF8));
     if(State==null || State.Tasks==null || State.Owned==null)throw new Exception("Invalid data");
-    Scheduler.Normalize(State);Living.Normalize(State);State.BubbleScale=Math.Max(60,Math.Min(160,State.BubbleScale));if(State.Companions==null)State.Companions=new Dictionary<string,LittlePet>(); State.PixelSize=Math.Max(1,Math.Min(5,State.PixelSize));Store.State.PetSize=Math.Max(40,Math.Min(320,Store.State.PetSize));
+    Scheduler.Normalize(State);Living.Normalize(State);DiaryCore.Normalize(State);State.BubbleScale=Math.Max(60,Math.Min(160,State.BubbleScale));if(State.Companions==null)State.Companions=new Dictionary<string,LittlePet>(); State.PixelSize=Math.Max(1,Math.Min(5,State.PixelSize));Store.State.PetSize=Math.Max(40,Math.Min(320,Store.State.PetSize));
    } catch { State=new Data(); Warning="저장 데이터를 읽지 못해 새 데이터를 사용합니다. 원본은 별도 파일로 보관합니다.";
     File.Copy(FilePath,FilePath+".damaged-"+AppClock.Now.ToString("yyyyMMddHHmmss"),true); }
   }
@@ -347,6 +348,8 @@ namespace DeskBuddy {
      if(options.Length!=2)throw new Exception("Pixel options");
      options[0].Checked=false;options[1].Checked=true;
      if(Store.State.Wander||!Store.State.Quiet)throw new Exception("Pixel toggle state");
+     f.Navigate("업무일지");Application.DoEvents();
+     if(!Descendants(f).OfType<WorkDiaryPanel>().Any())throw new Exception("WorkDiaryPanel navigation");
 
      Store.State=new Data();Store.Load();
      if(Store.State.Coins!=10 || Store.State.Completed!=1 || Store.State.Tasks.Count!=1 || Store.State.Equipped!="민트 리본")throw new Exception("Disk persistence");
@@ -398,7 +401,7 @@ namespace DeskBuddy {
    try{
     CastleTests.Run();DodgeEngine.Tests();Progression.Tests();
     LivingTests.Run();Companions.Tests();AdminAccess.Tests();using(var image=new Bitmap(500,200))using(var g=Graphics.FromImage(image)){foreach(int scale in new[]{60,100,160}){var bounds=new Rectangle(0,0,(int)(246*scale/100.0),(int)(54*scale/100.0));using(var font=Theme.BubbleFont(g,"일정 알림",bounds,scale))if(Math.Abs(font.Size-16*scale/100f)>0.01f)throw new Exception("Bubble font proportional scale");using(var font=Theme.BubbleFont(g,"긴 일정 알림입니다. 회의 준비와 자료 확인을 마치고 참석해주세요.",bounds,scale))if(g.MeasureString("긴 일정 알림입니다. 회의 준비와 자료 확인을 마치고 참석해주세요.",font,bounds.Width).Height>bounds.Height)throw new Exception("Bubble text fit");}}
-    VolleyballTests.Run();ScheduleTests.Run();
+    VolleyballTests.Run();ScheduleTests.Run();DiaryTests.Run();
     var d=new Data();var t=new TaskItem();
     if(!Rules.Complete(t,d)||d.Coins!=50||d.Completed!=1)throw new Exception("Completion");
     if(Rules.Complete(t,d)||d.Coins!=50)throw new Exception("Duplicate");
