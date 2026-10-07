@@ -165,7 +165,7 @@ namespace DeskBuddy {
  }
 
  public class MainForm:Form {
-  PetForm pet;Panel content,sidebar;Label wallet,countdown;Timer live=new Timer{Interval=1000};
+  PetForm pet;Panel content,sidebar;Label wallet,countdown,friend;Timer live=new Timer{Interval=1000};
   string page="나의 방";ListBox taskList;Dictionary<string,Button> nav=new Dictionary<string,Button>();Point drag;
   public MainForm(PetForm owner){
    pet=owner;Text="DeskBuddy · 작은 업무 모험";AutoScaleMode=AutoScaleMode.None;ClientSize=new Size(1024,744);
@@ -178,9 +178,9 @@ namespace DeskBuddy {
    header.Controls.Add(Theme.Button("X",969,9,38,38,(s,e)=>Close()));
    sidebar=new PixelPanel{Location=new Point(12, 70),Size=new Size(212,636),BackColor=Color.FromArgb(237,222,190)};Controls.Add(sidebar);
    sidebar.Controls.Add(new PetPortrait{Location=new Point(16,14),Size=new Size(180,104),BackColor=Theme.Cream});
-   var friend=Theme.Label(Store.State.PetName,16,124,180,26,11);friend.TextAlign=ContentAlignment.MiddleCenter;sidebar.Controls.Add(friend);
+   friend=Theme.Label(Store.State.PetName,16,124,180,26,11);friend.TextAlign=ContentAlignment.MiddleCenter;sidebar.Controls.Add(friend);
    string[] pages={"나의 방","오늘의 업무","집중 스튜디오","미니게임","코인 상점","나의 캐릭터","설정 / 소개"};
-   string[] names={"나의 방","퀘스트 보드","집중 모험","펫 배구","아이템 상점","캐릭터","옵션"};
+   string[] names={"나의 방","퀘스트 보드","집중 모험","미니게임","아이템 상점","캐릭터","옵션"};
    string[] icons={"home","quest","focus","star","shop","pet","options"};
    for(int i=0;i<pages.Length;i++){string target=pages[i];var b=(PixelButton)Theme.Button(names[i],16,171+i* 50,180,42,(s,e)=>Navigate(target));b.IconId=icons[i];sidebar.Controls.Add(b);nav[target]=b;}
    sidebar.Controls.Add(Theme.Label("SAVE FILE  01",20,546,176,24,10,Theme.Muted));sidebar.Controls.Add(Theme.Label("일정 완료  +20 G\n집중 1분    +1 G",20,576,178, 40,10,Theme.Muted));
@@ -199,6 +199,8 @@ namespace DeskBuddy {
   void Title(string english,string title,string hint){L(english,0,0,744,22,10,Theme.Muted);L(title,0,27,744, 40,22);L(hint,0,74,744,26,10,Theme.Muted);}
   public void Navigate(string target){page=target;RefreshPage();}
   public void RefreshPage(){
+   content.AutoScrollPosition=Point.Empty;
+   friend.Text=Store.State.PetName;
    
    foreach(Control c in content.Controls.Cast<Control>().ToArray())c.Dispose();content.Controls.Clear();countdown=null;
    int xp=Store.State.Completed*20+Store.State.FocusMinutes;wallet.Text="Lv."+(1+xp/100)+"  "+Store.State.PetName+"                   GOLD  "+Store.State.Coins.ToString("0000")+" G";
@@ -216,7 +218,8 @@ namespace DeskBuddy {
    bar.Controls.Add(new Panel{Location=new Point(3,3),Size=new Size(Math.Max(1,(int)(357*(xp%100)/100.0)),16),BackColor=Theme.Purple});
    hud.Controls.Add(Theme.Label("남은 퀘스트  "+Store.State.Tasks.Count(t=>!t.Done),558, 20,170,26));
    B("퀘스트 받으러 가기",0,503,260,48,(s,e)=>Navigate("오늘의 업무"),true);
-   B("쓰다듬기",276,503,218,48,(s,e)=>pet.Say("헤헤. 네가 있어서 좋아!",false));
+   B("쓰다듬기",276,503,104,48,(s,e)=>pet.Say("헤헤. 네가 있어서 좋아!",false));
+   B("옆돌기",390,503,104,48,(s,e)=>pet.Cartwheel());
    B("상점 구경하기",510,503,234,48,(s,e)=>Navigate("코인 상점"));
    L("방 안의 친구를 클릭해서 인사해보세요.",0,563,744,22,10,Theme.Muted);
   }
@@ -265,9 +268,10 @@ namespace DeskBuddy {
    Add(new VolleyballPreview(pet){Location=new Point(0,111),Size=new Size(744,310)});
    L("← → 또는 A/D 이동   SPACE 점프   ↓ 또는 X 스매시",0,437,744,28);
    L("ESC 일시정지 / 다른 창 전환 시 자동 정지 / R 다시 한 판",0,468,744,28,10,Theme.Muted);
-   B("바탕화면 배구 시작",0,507,744,48,(s,e)=>pet.StartVolleyball(),true);
+   B("바탕화면 배구 시작",0,507,364,48,(s,e)=>pet.StartVolleyball(),true);
+   B("마법의 성 모험 시작",380,507,364,48,(s,e)=>pet.StartCastle(),true);
    int played=Store.State.GamesDate==AppClock.Now.ToString("yyyy-MM-dd")?Store.State.GamesPlayed:0;
-   L("승리 +20 G / 패배 +5 G / 오늘 보상 "+played+" / 3 · 게임은 계속 가능해요.",0,567,744,20,10,Theme.Muted);
+   L("성 3탄 클리어 +50 G · 배구 승리 +20 G · 실패 +5 G · 오늘 "+played+" / 3",0,567,744,20,10,Theme.Muted);
   }
 
   void Shop(){
@@ -287,20 +291,37 @@ namespace DeskBuddy {
   }
   void Character(){
    Title("CHARACTER / CUSTOMIZE","나만의 친구","좋아하는 캐릭터 이미지로 교체하고 이름을 지어줘요.");
-   Add(new RoomScene{Location=new Point(0,111),Size=new Size(744,235)});
-   var form=Card(0,365,744, 70);
+   var form=Card(0,289,720,70);
    form.Controls.Add(Theme.Label("이름",16, 20,80, 28));
-   var name=Theme.Input(Store.State.PetName,98, 20,426);name.MaxLength=24;form.Controls.Add(name);
-   form.Controls.Add(Theme.Button("이름 저장",540,14,188,42,(s,e)=>{if(String.IsNullOrWhiteSpace(name.Text))return;Store.State.PetName=name.Text.Trim();Store.Save();RefreshPage();},true));
-   B("캐릭터 이미지 불러오기",0,451,364, 46,(s,e)=>Import(),true);
-   B("기본 스누피로 돌아가기",380,451,364, 46,(s,e)=>{Store.State.ImagePath="";Store.State.PetName="스누피";PetArt.LoadCustom("");Store.Save();pet.Invalidate();RefreshPage();});
+   var name=Theme.Input(Store.State.PetName,98,20,406);name.MaxLength=24;form.Controls.Add(name);
+   EventHandler saveName=(s,e)=>{if(String.IsNullOrWhiteSpace(name.Text)){MessageBox.Show("이름을 입력해주세요.");return;}string previous=Store.State.PetName;Store.State.PetName=name.Text.Trim();if(!Store.Save()){Store.State.PetName=previous;return;}pet.RefreshIdentity();RefreshPage();};
+   form.Controls.Add(Theme.Button("이름 저장",520,14,188,42,saveName,true));
+   name.KeyDown+=(s,e)=>{if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;saveName(s,e);}};
+   B("캐릭터 이미지 불러오기",0,375,350,46,(s,e)=>Import(),true);
+   B("기본 캐릭터로 돌아가기",370,375,350,46,(s,e)=>SelectCharacter(""));
 
-   var sizing=Card(0,510,744,70);sizing.Controls.Add(Theme.Label("바탕화면 크기",16,20,175,30));
+   var sizing=Card(0,437,720,70);sizing.Controls.Add(Theme.Label("바탕화면 크기",16,20,175,30));
    var slider=new PixelSizeSlider{Location=new Point(197,17),Size=new Size(315,36),Value=Store.State.PetSize};
    var sizeLabel=Theme.Label(Store.State.PetSize+" px",525,20,90,30);sizing.Controls.Add(sizeLabel);sizing.Controls.Add(slider);
    slider.ValueChanged+=(s,e)=>{Store.State.PetSize=slider.Value;pet.ApplyPetSize();sizeLabel.Text=slider.Value+" px";Store.Save();};
-   sizing.Controls.Add(Theme.Button("기본",629,16,98,38,(s,e)=>slider.Value=140));
+   sizing.Controls.Add(Theme.Button("기본",607,16,98,38,(s,e)=>slider.Value=140));
+   L("위에서 친구를 골라요. 이름은 그대로 유지돼요.",0,525,495,28,10,Theme.Muted);
+   B("샘플 여러 개 추가",510,521,210,38,(s,e)=>AddSamples());
+   int index=0;foreach(string sample in CharacterLibrary.Samples()){
+    string path=sample;int x=index%6*120,y=index<6?111:585+(index-6)/6*166;bool selected=Store.State.ImagePath==path||(Store.State.ImagePath==""&&path==CharacterLibrary.Default);
+    var card=Card(x,y,112,160,selected?Theme.Gold:Theme.Cream);card.Controls.Add(new SamplePortrait(path){Location=new Point(6,6),Size=new Size(100,112)});
+    card.Controls.Add(Theme.Button(selected?"선택됨":CharacterLibrary.Label(path),6,121,100,33,(s,e)=>SelectCharacter(path)));index++;
+   }
+   if(index==0)L("샘플 여러 개 추가로 이미지들을 등록해 주세요.",0,650,744,30,10,Theme.Muted);
 
+  }
+  void SelectCharacter(string path){if(!PetArt.LoadCustom(path)){MessageBox.Show("캐릭터 이미지를 읽지 못했습니다.");return;}Store.State.ImagePath=path;Store.Save();pet.RefreshIdentity();RefreshPage();}
+  void AddSamples(){
+   using(var dialog=new OpenFileDialog{Filter="캐릭터 이미지|*.png;*.jpg;*.jpeg;*.bmp",Multiselect=true,Title="샘플 캐릭터들을 선택하세요"}){
+    if(dialog.ShowDialog()!=DialogResult.OK)return;
+    foreach(string source in dialog.FileNames)try{string target=CharacterLibrary.Import(source);if(Store.State.CharacterSamples==null)Store.State.CharacterSamples=new List<string>();Store.State.CharacterSamples.Add(target);}catch(Exception ex){MessageBox.Show(Path.GetFileName(source)+": "+ex.Message);}
+    Store.Save();RefreshPage();
+   }
   }
   void Import(){
    using(var dialog=new OpenFileDialog{Filter="캐릭터 이미지|*.png;*.jpg;*.jpeg;*.bmp",Title="캐릭터 선택"}){

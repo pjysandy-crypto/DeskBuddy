@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -26,7 +26,7 @@ namespace DeskBuddy {
   public int Coins=30, Completed, FocusCount, FocusMinutes;
   public string PetName="스누피", ImagePath="", Equipped="기본"; public int PixelSize=3; public int PetSize=140;
   public List<string> Owned=new List<string>{"기본"}; public List<TaskItem> Tasks=new List<TaskItem>();
-  public bool Wander=true, Quiet=false; public DateTime FocusEnd=DateTime.MinValue; public string FocusEndLocal=""; public int SessionMinutes; public string GamesDate=""; public int GamesPlayed;
+  public bool Wander=true, Quiet=false; public bool Cartwheels=true; public List<string> CharacterSamples=new List<string>(); public DateTime FocusEnd=DateTime.MinValue; public string FocusEndLocal=""; public int SessionMinutes; public string GamesDate=""; public int GamesPlayed;
  }
  public static class Store {
   public static readonly string Root=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"DeskBuddy");
@@ -40,7 +40,7 @@ namespace DeskBuddy {
     File.Copy(FilePath,FilePath+".damaged-"+AppClock.Now.ToString("yyyyMMddHHmmss"),true); }
   }
   public static bool Save() {
-   try { Scheduler.PrepareSave(State); Directory.CreateDirectory(Root); string temp=FilePath+".tmp";
+   try { Scheduler.PrepareSave(State); Directory.CreateDirectory(Path.GetDirectoryName(FilePath)); string temp=FilePath+".tmp";
     File.WriteAllText(temp,new JavaScriptSerializer().Serialize(State),Encoding.UTF8);
     if(File.Exists(FilePath))File.Replace(temp,FilePath,FilePath+".bak");else File.Move(temp,FilePath);return true;
    } catch(Exception e){MessageBox.Show("저장하지 못했습니다.\n"+e.Message,"DeskBuddy",MessageBoxButtons.OK,MessageBoxIcon.Warning);return false;}
@@ -48,9 +48,11 @@ namespace DeskBuddy {
  }
  public static class Rules {
 
-  public static int GameReward(Data d,int score,DateTime now){
+  public static int GameReward(Data d,int score,DateTime now){return AwardGame(d,score,now,20);}
+  public static int CastleReward(Data d,bool won,DateTime now){return AwardGame(d,won?50:5,now,50);}
+  static int AwardGame(Data d,int score,DateTime now,int maximum){
    string day=now.ToString("yyyy-MM-dd");if(d.GamesDate!=day){d.GamesDate=day;d.GamesPlayed=0;}
-   if(d.GamesPlayed>=3)return -1;d.GamesPlayed++;int reward=Math.Max(0,Math.Min(20,score));d.Coins+=reward;return reward;
+   if(d.GamesPlayed>=3)return -1;d.GamesPlayed++;int reward=Math.Max(0,Math.Min(maximum,score));d.Coins+=reward;return reward;
   }
 
   public static bool Complete(TaskItem t,Data d){return Scheduler.Complete(t,d,AppClock.Now);}
@@ -60,8 +62,8 @@ namespace DeskBuddy {
  public static class PetArt {
   public static Bitmap Custom,ScheduleCustom; static string schedulePath=""; public static bool HasCustom{get{return ScheduleCustom!=null||Custom!=null;}} public static bool SetScheduleImage(string path){path=path??"";if(path==schedulePath)return false;schedulePath=path;if(ScheduleCustom!=null){ScheduleCustom.Dispose();ScheduleCustom=null;}try{if(path.Length>0)using(var im=Image.FromFile(path))ScheduleCustom=new Bitmap(im);}catch(Exception ex){Startup.Log("Schedule image: "+ex.Message);}return true;}
   public static bool LoadCustom(string path){
-   try { if(String.IsNullOrEmpty(path)){if(Custom!=null)Custom.Dispose();Custom=null;return true;}
-    using(var im=Image.FromFile(path)){var b=new Bitmap(im);if(Custom!=null)Custom.Dispose();Custom=b;}return true;
+   try { if(String.IsNullOrEmpty(path))path=CharacterLibrary.Default;if(String.IsNullOrEmpty(path)){if(Custom!=null)Custom.Dispose();Custom=null;return true;}
+    var b=CharacterLibrary.Read(path);if(Custom!=null)Custom.Dispose();Custom=b;return true;
    }catch{return false;}
   }
 
@@ -119,28 +121,54 @@ namespace DeskBuddy {
   }
  }
  public class PetForm:Form {
-  Timer animation=new Timer{Interval=150},clock=new Timer{Interval=1000};NotifyIcon tray;MainForm dashboard;VolleyballForm game;Random random=new Random();
+  Timer animation=new Timer{Interval=50},clock=new Timer{Interval=1000};NotifyIcon tray;MainForm dashboard;Form game;Random random=new Random();int cartwheelFrame=-1;
   Queue<ScheduleNotice> pendingNotices=new Queue<ScheduleNotice>(); DateTime nextNotice=DateTime.MinValue,noticePoseUntil=DateTime.MinValue;string noticePose=""; int frame,direction=1,ticks;Point drag;bool dragging,shuttingDown;DateTime bubbleUntil;string bubble="오늘도 함께 한 걸음!";Rectangle area;
   public PetForm(){
+   if(PetArt.Custom==null)PetArt.LoadCustom(Store.State.ImagePath);
    Text="DeskBuddy · 바탕화면 펫";FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;
    BackColor=Color.Black;TransparencyKey=Color.Empty;Size=new Size(Math.Max(280,Store.State.PetSize+28),82+Store.State.PetSize+8);StartPosition=FormStartPosition.Manual;DoubleBuffered=true;AutoScaleMode=AutoScaleMode.None;
    area=Screen.PrimaryScreen.WorkingArea;Location=new Point(area.Right-Width-70,area.Bottom-Height-12);bubbleUntil=AppClock.Now.AddSeconds(12);
    var menu=new ContextMenuStrip();
    menu.Items.Add("업무 대시보드 열기",null,(s,e)=>OpenDashboard());
    menu.Items.Add("바탕화면 배구",null,(s,e)=>StartVolleyball());
+   menu.Items.Add("마법의 성 모험",null,(s,e)=>StartCastle());
+   menu.Items.Add("옆돌기!",null,(s,e)=>Cartwheel());
+   menu.Items.Add("산책 중 옆돌기 켜기 / 끄기",null,(s,e)=>{Store.State.Cartwheels=!Store.State.Cartwheels;Store.Save();});
    menu.Items.Add("응원 한마디",null,(s,e)=>Say("작은 완료 하나가 큰 성과가 돼!",false));
    menu.Items.Add("산책 켜기 / 끄기",null,(s,e)=>{Store.State.Wander=!Store.State.Wander;Store.Save();});
    menu.Items.Add("펫 숨기기 / 보이기",null,(s,e)=>Visible=!Visible);
    menu.Items.Add("종료",null,(s,e)=>Quit());ContextMenuStrip=menu;
    tray=new NotifyIcon{Icon=SystemIcons.Information,Text="DeskBuddy · 업무 친구",Visible=true,ContextMenuStrip=menu};
+   RefreshIdentity();
    tray.DoubleClick+=(s,e)=>{Show();OpenDashboard();};
    MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){drag=e.Location;dragging=true;}};
    MouseMove+=(s,e)=>{if(dragging)Location=new Point(Left+e.X-drag.X,Top+e.Y-drag.Y);};
    MouseUp+=(s,e)=>{dragging=false;KeepInside();};MouseDoubleClick+=(s,e)=>OpenDashboard();
-   animation.Tick+=(s,e)=>{frame++;if(!dragging && game==null && Store.State.Wander && Store.State.FocusEnd==DateTime.MinValue && ++ticks%3==0){Left+=direction*4;area=Screen.FromControl(this).WorkingArea;if(Left<area.Left || Right>area.Right){direction=-direction;KeepInside();}}RenderLayered();};
+   animation.Tick+=(s,e)=>Animate();
    clock.Tick+=(s,e)=>TickClock();animation.Start();clock.Start();
    Shown+=(s,e)=>{RenderLayered();OpenDashboard();if(Store.Warning.Length>0)MessageBox.Show(Store.Warning,"DeskBuddy");};
    FormClosing+=(s,e)=>{if(!shuttingDown){e.Cancel=true;Hide();}};
+  }
+
+  void Animate(){
+   frame++;bool available=!dragging&&game==null&&Store.State.FocusEnd==DateTime.MinValue;
+   if(!available)cartwheelFrame=-1;
+   if(available&&Store.State.Wander&&Store.State.Cartwheels&&cartwheelFrame<0&&random.Next(450)==0)cartwheelFrame=0;
+   if(available&&(cartwheelFrame>=0||Store.State.Wander&&++ticks%9==0)){
+    Left+=direction*(cartwheelFrame>=0?5:4);area=Screen.FromControl(this).WorkingArea;
+    if(Left<area.Left||Right>area.Right){direction=-direction;cartwheelFrame=-1;KeepInside();}
+   }
+   if(cartwheelFrame>=0&&++cartwheelFrame>=24)cartwheelFrame=-1;
+   RenderLayered();
+  }
+  public void Cartwheel(){if(game!=null||Store.State.FocusEnd!=DateTime.MinValue)return;cartwheelFrame=0;Say("옆돌기~ 같이 한 바퀴!",false);}
+  public void RefreshIdentity(){Text="DeskBuddy · "+Store.State.PetName;tray.Text=("DeskBuddy · "+Store.State.PetName);RenderLayered();}
+  public void StartCastle(){StartGame(()=>new CastleForm(this));}
+  void StartGame(Func<Form> create){
+   if(Store.State.FocusEnd!=DateTime.MinValue){MessageBox.Show("집중 모험을 끝내고 한 판 해요!");return;}
+   if(game!=null&&!game.IsDisposed){game.Activate();return;}
+   if(dashboard!=null&&!dashboard.IsDisposed)dashboard.Hide();Hide();cartwheelFrame=-1;
+   game=create();game.FormClosed+=(s,e)=>{game=null;if(!shuttingDown){Show();RenderLayered();OpenDashboard();}};game.Show();game.Activate();
   }
 
   public void ApplyPetSize(){
@@ -149,12 +177,7 @@ namespace DeskBuddy {
    Left=center-Width/2;Top=bottom-Height;KeepInside();RenderLayered();
   }
   public void StartVolleyball(){
-   if(Store.State.FocusEnd!=DateTime.MinValue){MessageBox.Show("집중 모험을 끝내고 한 판 해요!");return;}
-   if(game!=null&&!game.IsDisposed){game.Activate();return;}
-   if(dashboard!=null&&!dashboard.IsDisposed)dashboard.Hide();Hide();
-   game=new VolleyballForm(this);
-   game.FormClosed+=(s,e)=>{game=null;if(!shuttingDown){Show();RenderLayered();OpenDashboard();}};
-   game.Show();game.Activate();
+   StartGame(()=>new VolleyballForm(this));
   }
 
   void KeepInside(){area=Screen.FromControl(this).WorkingArea;Left=Math.Max(area.Left,Math.Min(Left,area.Right-Width));Top=Math.Max(area.Top,Math.Min(Top,area.Bottom-Height));}
@@ -185,7 +208,9 @@ namespace DeskBuddy {
     using(var f=Theme.Font(9))Theme.Text(graphics,bubble,f,Theme.Ink,new Rectangle(17,15,246,52),ContentAlignment.MiddleCenter);
     using(var b=new SolidBrush(Color.FromArgb(255,253,246)))graphics.FillPolygon(b,new[]{new Point(130,75),new Point(146,75),new Point(137,87)});
    }
-   PetArt.Draw(graphics,new Rectangle((Width-Store.State.PetSize)/2,82+(frame%2),Store.State.PetSize,Store.State.PetSize),frame,direction<0,Store.State.Equipped);
+   var transform=graphics.Save();int size=Store.State.PetSize;
+   if(cartwheelFrame>=0){graphics.TranslateTransform(Width/2f,82+size/2f);graphics.RotateTransform(direction*cartwheelFrame*360f/24);double angle=cartwheelFrame*Math.PI*2/24;float fit=(float)(1/(Math.Abs(Math.Cos(angle))+Math.Abs(Math.Sin(angle))));graphics.ScaleTransform(fit,fit);graphics.TranslateTransform(-Width/2f,-82-size/2f);}
+   PetArt.Draw(graphics,new Rectangle((Width-size)/2,82+(frame/3%2),size,size),frame/3,direction<0,Store.State.Equipped);graphics.Restore(transform);
   }
   protected override void Dispose(bool disposing){if(disposing){animation.Dispose();clock.Dispose();if(tray!=null){tray.Visible=false;tray.Dispose();tray=null;}}base.Dispose(disposing);}
   public void Quit(){shuttingDown=true;if(game!=null&&!game.IsDisposed)game.Close();Store.Save();animation.Stop();clock.Stop();tray.Visible=false;tray.Dispose();Application.Exit();}
@@ -206,6 +231,7 @@ namespace DeskBuddy {
    if(args.Contains("--self-test"))return SelfTest();
    Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
    if(args.Contains("--volley-test"))return VolleyballTests.Execute();
+   if(args.Contains("--castle-test"))return CastleTests.Execute();
    if(args.Contains("--image-test")){int n=Array.IndexOf(args,"--image-test");if(n+1>=args.Length)return 2;return ImageTest(args[n+1]);}
    if(args.Contains("--ui-test"))return UiTest();
    if(args.Contains("--preview"))return PreviewShots();
@@ -259,6 +285,19 @@ namespace DeskBuddy {
      if(!FindButton(f,"바탕화면 배구 시작").Enabled)throw new Exception("Volleyball launch button");
      VolleyballTests.Run();ScheduleTests.Run();
      f.Navigate("나의 캐릭터");Application.DoEvents();
+     Descendants(f).OfType<TextBox>().Single().Text="새 이름";FindButton(f,"이름 저장").PerformClick();Application.DoEvents();
+     if(Store.State.PetName!="새 이름"||!Descendants(f).OfType<Label>().Any(l=>l.Text=="새 이름")||p.Text!="DeskBuddy · 새 이름")throw new Exception("Name refresh");
+     string sample=Path.Combine(temp,"sample.png");using(var image=new Bitmap(24,48)){using(var g=Graphics.FromImage(image))g.Clear(Color.Aqua);image.Save(sample,ImageFormat.Png);}
+     Store.State.CharacterSamples.Add(sample);f.RefreshPage();FindButton(f,"sample").PerformClick();Application.DoEvents();
+     if(Store.State.ImagePath!=sample||PetArt.Custom==null||PetArt.Custom.Height!=48)throw new Exception("Sample selection");
+     FindButton(f,"기본 캐릭터로 돌아가기").PerformClick();Application.DoEvents();
+     if(Store.State.PetName!="새 이름"||Store.State.ImagePath!="")throw new Exception("Character change preserves name");
+     p.Cartwheel();using(var start=p.RenderSnapshot()){
+      var advance=typeof(PetForm).GetMethod("Animate",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic);
+      for(int i=0;i<6;i++)advance.Invoke(p,null);
+      using(var rotated=p.RenderSnapshot()){bool changed=false;for(int y=82;y<start.Height;y++)for(int x=0;x<start.Width;x++)if(start.GetPixel(x,y)!=rotated.GetPixel(x,y))changed=true;if(!changed)throw new Exception("Cartwheel frame rendering");}
+      for(int i=0;i<18;i++)advance.Invoke(p,null);
+     }
      Descendants(f).OfType<PixelSizeSlider>().Single().Value=84;
      if(Store.State.PetSize!=84||p.Height!=174)throw new Exception("Live pet sizing");
      f.Navigate("설정 / 소개");Application.DoEvents();
@@ -270,8 +309,9 @@ namespace DeskBuddy {
      Store.State=new Data();Store.Load();
      if(Store.State.Coins!=10 || Store.State.Completed!=1 || Store.State.Tasks.Count!=1 || Store.State.Equipped!="민트 리본")throw new Exception("Disk persistence");
      if(Store.State.Wander||!Store.State.Quiet)throw new Exception("Pixel options persistence");if(Store.State.PetSize!=84)throw new Exception("Pet size persistence");
+     if(Store.State.PetName!="새 이름"||Store.State.CharacterSamples.Count!=1)throw new Exception("Name and library persistence");
     }
-    File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"validation.txt"),"PASS: task creation via UI, completion reward, accessory purchase, volleyball page and physics, live pet sizing, disk save/reload, pixel toggles and size persistence.\r\nWindows notification delivery and multi-monitor/high-DPI behavior require manual verification.");
+    File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"validation.txt"),"PASS: name refresh and persistence, sample selection and persistence, character switch preserves name, task creation via UI, completion reward, accessory purchase, volleyball page and physics, live pet sizing, disk save/reload, pixel toggles and size persistence.\r\nWindows notification delivery and multi-monitor/high-DPI behavior require manual verification.");
     return 0;
    }catch(Exception e){File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"validation.txt"),"FAIL: "+e);return 1;}
    finally{Store.FilePath=oldPath;Store.State=oldState;foreach(string file in Directory.GetFiles(temp))File.Delete(file);Directory.Delete(temp);}
@@ -314,6 +354,7 @@ namespace DeskBuddy {
 
   static int SelfTest(){
    try{
+    CastleTests.Run();
     VolleyballTests.Run();ScheduleTests.Run();
     var d=new Data();var t=new TaskItem();
     if(!Rules.Complete(t,d)||d.Coins!=50||d.Completed!=1)throw new Exception("Completion");

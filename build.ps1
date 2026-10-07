@@ -9,7 +9,10 @@ New-Item -ItemType Directory -Path $release -Force | Out-Null
 $executable=Join-Path $release $OutputName
 $font=Join-Path $PSScriptRoot 'assets\neodgm.ttf'
 if(!(Test-Path -LiteralPath $font)){throw 'Pixel font missing: assets/neodgm.ttf'}
-& $compiler /nologo /target:winexe /optimize+ /platform:anycpu /codepage:65001 ("/r:"+ (Join-Path $PSScriptRoot "lib\ComponentFactory.Krypton.Toolkit.dll")) ("/resource:"+ (Join-Path $PSScriptRoot "lib\ComponentFactory.Krypton.Toolkit.dll")+",DeskBuddy.Krypton") /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Web.Extensions.dll ("/resource:"+$font+",DeskBuddy.PixelFont") ("/out:"+$executable) (Join-Path $PSScriptRoot 'DeskBuddy.cs') (Join-Path $PSScriptRoot 'PixelUI.cs') (Join-Path $PSScriptRoot 'AlphaWindow.cs') (Join-Path $PSScriptRoot 'Volleyball.cs') (Join-Path $PSScriptRoot 'ScheduleCore.cs') (Join-Path $PSScriptRoot 'ScheduleEditor.cs')
+$characterResources=@()
+$characterFolder=Join-Path $PSScriptRoot 'img\Character'
+if(Test-Path -LiteralPath $characterFolder){$characterResources=@(Get-ChildItem -LiteralPath $characterFolder -Filter '*.png' -File | ForEach-Object { '/resource:'+$_.FullName+',DeskBuddy.Character.'+$_.BaseName })}
+& $compiler /nologo /target:winexe /optimize+ /platform:anycpu /codepage:65001 ("/r:"+ (Join-Path $PSScriptRoot "lib\ComponentFactory.Krypton.Toolkit.dll")) ("/resource:"+ (Join-Path $PSScriptRoot "lib\ComponentFactory.Krypton.Toolkit.dll")+",DeskBuddy.Krypton") /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Web.Extensions.dll ("/resource:"+$font+",DeskBuddy.PixelFont") @characterResources ("/out:"+$executable) (Join-Path $PSScriptRoot 'DeskBuddy.cs') (Join-Path $PSScriptRoot 'PixelUI.cs') (Join-Path $PSScriptRoot 'AlphaWindow.cs') (Join-Path $PSScriptRoot 'Volleyball.cs') (Join-Path $PSScriptRoot 'ScheduleCore.cs') (Join-Path $PSScriptRoot 'ScheduleEditor.cs') (Join-Path $PSScriptRoot 'Castle.cs') (Join-Path $PSScriptRoot 'CharacterLibrary.cs')
 if($LASTEXITCODE -ne 0){throw 'Build failed'}
 if($Test){
  $process=Start-Process -FilePath $executable -ArgumentList '--self-test' -WindowStyle Hidden -PassThru -Wait
