@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
@@ -43,7 +43,7 @@ namespace DeskBuddy {
   public PixelToggle EveToggle,AllDayToggle;TaskItem existing;string picturePath="";SchedulePicture preview;Label clockLabel;
   Timer clock=new Timer{Interval=1000};
   public ScheduleEditor(TaskItem item,string preset=""){
-   existing=item;Text=item==null?"새 일정":"일정 수정";AutoScaleMode=AutoScaleMode.None;ClientSize=new Size(760,662);
+   existing=item;Icon=AppIdentity.Icon;Text=item==null?"새 일정":"일정 수정";AutoScaleMode=AutoScaleMode.None;ClientSize=new Size(760,662);
    StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.None;BackColor=Theme.Bg;Font=Theme.Font(10);DoubleBuffered=true;
    Controls.Add(Theme.Label("SCHEDULE / "+(item==null?"새 일정":"일정 수정"),22,18,620,30,14));
    Controls.Add(Theme.Button("X",704,12,40,40,(s,e)=>{DialogResult=DialogResult.Cancel;Close();}));
@@ -51,7 +51,7 @@ namespace DeskBuddy {
    var form=new PixelPanel{Location=new Point(16,92),Size=new Size(728,220)};Controls.Add(form);
    form.Controls.Add(Theme.Label("일정 이름",16,10,480,24));
    TitleInput=Theme.Input(item==null?"":item.Title,16,38,471);TitleInput.MaxLength=100;form.Controls.Add(TitleInput);
-   CategoryInput=Choice(new[]{"업무","회의","마감","개인","휴식","출근","퇴근","휴가"},503,38,207);form.Controls.Add(CategoryInput);
+   CategoryInput=Choice(new[]{"업무","회의","마감","개인","휴식","출근","퇴근","휴가","야근"},503,38,207);form.Controls.Add(CategoryInput);
    form.Controls.Add(Theme.Label("날짜 (달력 선택)                 시간 (직접 입력 가능)",16,79,688,24,10,Theme.Muted));
    DateTimeInput=new ScheduleDateTimePicker{Location=new Point(16,109)};form.Controls.Add(DateTimeInput);
    form.Controls.Add(Theme.Button("오늘",503,105,98,38,(s,e)=>DateTimeInput.SetDate(AppClock.Now.Date)));
@@ -72,8 +72,8 @@ namespace DeskBuddy {
    appearance.Controls.Add(Theme.Label("유지 시간",155,100,164,28,10,Theme.Muted));
    DurationInput=Choice(new[]{"30분","1시간","2시간"},322,100,200);appearance.Controls.Add(DurationInput);
    appearance.Controls.Add(Theme.Label("종일: 하루 유지",530,100,182,28,10,Theme.Muted));
-   Controls.Add(Theme.Label("평일: 월~금 (공휴일 포함) / 매주: 선택한 요일 / 일정 종료·완료 후 원래 모습 복귀",22,577,714,30,10,Theme.Muted));
-   Controls.Add(Theme.Button(item==null?"+ 일정 추가":"변경 저장", 16,610,470, 40,(s,e)=>{string error;if(!TrySave(out error))MessageBox.Show(error,"일정 설정");},true));
+   Controls.Add(Theme.Label("일정 완료 +20 G / 야근 분류 또는 제목에 '야근' 포함: 완료 -20 G (최저 0 G)",22,577,714,30,10,Theme.Muted));
+   Controls.Add(Theme.Button(item==null?"+ 일정 추가":"변경 저장", 16,610,470, 40,(s,e)=>{string error;if(!TrySave(out error))GameAlert.Show(error,"일정 설정");},true));
    Controls.Add(Theme.Button("취소",503,610,241, 40,(s,e)=>{DialogResult=DialogResult.Cancel;Close();}));
    if(item!=null){
     DateTimeInput.Value=Scheduler.Due(item);TitleInput.Text=item.Title;CategoryInput.SelectedItem=item.Category;RepeatInput.SelectedItem=item.Repeat;AllDayToggle.Checked=item.AllDay;EveToggle.Checked=item.EveReminder;EveTimeInput.Text=item.EveTime;
@@ -83,6 +83,8 @@ namespace DeskBuddy {
     TitleInput.Text=preset;CategoryInput.SelectedItem=preset;RepeatInput.SelectedItem="평일";
     var value=AppClock.Now.Date.AddHours(preset=="출근"?9:18);if(value<=AppClock.Now)value=value.AddDays(1);
     DateTimeInput.Value=Scheduler.FirstAllowed(value,"평일");
+   }else if(preset=="야근"){
+    TitleInput.Text="야근";CategoryInput.SelectedItem="야근";var end=AppClock.Now.Date.AddHours(21);if(end<=AppClock.Now)end=end.AddDays(1);DateTimeInput.Value=end;
    }else if(preset=="휴가"){
     TitleInput.Text="휴가";CategoryInput.SelectedItem="휴가";DateTimeInput.Value=AppClock.Now.Date.AddDays(1).AddHours(9);AllDayToggle.Checked=true;EveToggle.Checked=true;
    }
@@ -100,7 +102,7 @@ namespace DeskBuddy {
     if(dialog.ShowDialog()!=DialogResult.OK)return;
     try{using(var im=Image.FromFile(dialog.FileName))if(im.Width>4096||im.Height>4096||new FileInfo(dialog.FileName).Length>10*1024*1024)throw new Exception("10MB / 4096px 이하 이미지를 선택해주세요.");
      preview.SetSource(dialog.FileName);picturePath=dialog.FileName;
-    }catch(Exception ex){MessageBox.Show(ex.Message,"이미지 선택");}
+    }catch(Exception ex){GameAlert.Show(ex.Message,"이미지 선택");}
    }
   }
   public bool TrySave(out string error){

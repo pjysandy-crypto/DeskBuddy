@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -68,10 +68,12 @@ namespace DeskBuddy {
    if(t.Repeat=="매주")while(day.DayOfWeek!=due.DayOfWeek)day=day.AddDays(1);
    return FirstAllowed(At(day,t),t.Repeat);
   }
+  public static bool Overtime(TaskItem t){return t.Category=="야근"||(t.Title??"").Contains("야근");}
+  public static int CompletionCoins(TaskItem t){return Overtime(t)?-20:20;}
   public static bool Complete(TaskItem t,Data d,DateTime now){
    if(t.Done)return false;DateTime due=Due(t);string key=AppClock.Encode(due);
    if(t.Repeat!="한 번"&&(due.Date>now.Date||t.LastCompletedLocal==key))return false;
-   d.Completed++;d.Coins+=20;t.LastCompletedLocal=key;
+   d.Completed++;d.Coins=Math.Max(0,d.Coins+CompletionCoins(t));t.LastCompletedLocal=key;
    if(t.Repeat=="한 번")t.Done=true;else Rearm(t,Next(t,now));return true;
   }
   public static bool Skip(TaskItem t,DateTime now){if(t.Repeat=="한 번"||t.Done)return false;Rearm(t,Next(t,now));return true;}
@@ -124,6 +126,10 @@ namespace DeskBuddy {
    d.FocusEnd=new DateTime(2026,10,6,10,0,0);Scheduler.PrepareSave(d);restored=serializer.Deserialize<Data>(serializer.Serialize(d));Scheduler.Normalize(restored);Check(restored.FocusEnd.Hour==10,"Focus timezone roundtrip");
    TimeSpan time;Check(AppClock.Time("9:00",out time)&&time.Hours==9&&!AppClock.Time("25:00",out time),"24-hour input validation");
    var legacy=new Data();legacy.Tasks.Add(new TaskItem{Due=utc});Scheduler.Normalize(legacy);Check(Scheduler.Due(legacy.Tasks[0]).Hour==9,"Legacy UTC migration");
+   d=new Data{Coins=75};var overtime=new TaskItem{Title="프로젝트 마무리",Category="야근"};Check(Scheduler.Complete(overtime,d,AppClock.Now)&&d.Coins==55,"Overtime deduct twenty");Check(!Scheduler.Complete(overtime,d,AppClock.Now)&&d.Coins==55,"No duplicate overtime deduction");
+   overtime=new TaskItem{Title="개발 야근",Category="업무"};Check(Scheduler.Complete(overtime,d,AppClock.Now)&&d.Coins==35,"Overtime title detection");
+   overtime=new TaskItem{Category="야근"};d.Coins=7;Check(Scheduler.Complete(overtime,d,AppClock.Now)&&d.Coins==0,"Overtime zero floor");
+   overtime=new TaskItem{Category="야근",Repeat="매일",AnchorTime="21:00"};Scheduler.SetDue(overtime,AppClock.Now.Date.AddHours(21));d.Coins=100;Check(Scheduler.Complete(overtime,d,AppClock.Now)&&d.Coins==80&&!Scheduler.Complete(overtime,d,AppClock.Now),"Recurring overtime charged once per occurrence");Check(Scheduler.Complete(overtime,d,AppClock.Now.AddDays(1))&&d.Coins==60,"Next overtime occurrence");
   }
  }
 }

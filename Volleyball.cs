@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -78,7 +78,7 @@ namespace DeskBuddy {
   Stopwatch watch=new Stopwatch();double previous,accumulator;bool started,paused;int reward=-2;PetForm owner;
   Queue<PointF> trail=new Queue<PointF>();Point drag;bool movingWindow;
   public VolleyballForm(PetForm pet){
-   owner=pet;Text="DeskBuddy · 바탕화면 배구";FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=true;TopMost=true;AutoScaleMode=AutoScaleMode.None;
+   owner=pet;Icon=AppIdentity.Icon;Text="DeskBuddy · 바탕화면 배구";FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=true;TopMost=true;AutoScaleMode=AutoScaleMode.None;
    ClientSize=new Size(900,540);StartPosition=FormStartPosition.Manual;
    var screen=Screen.FromControl(pet).WorkingArea;Location=new Point(screen.Left+Math.Max(0,(screen.Width-900)/2),screen.Bottom-Height-12);
    KeyPreview=true;BackColor=Color.Black;TransparencyKey=Color.Empty;
@@ -163,7 +163,7 @@ namespace DeskBuddy {
   
   void DrawPlayer(Graphics g,VolleyPlayer p,bool mine){
    Theme.Fill(g,Color.FromArgb(70,58,41,32),(int)p.X-36,443,72,5);
-   if(mine)PetArt.Draw(g,new Rectangle((int)p.X- 50,(int)p.Y- 60,100,100),(int)(watch.Elapsed.TotalSeconds*6),false,Store.State.Equipped);
+   if(mine)PetArt.Draw(g,new Rectangle((int)p.X- 50,(int)p.Y- 60,100,100),(int)(watch.Elapsed.TotalSeconds*6),false,Progression.Accessory(Store.State));
    else{
     using(var b=new Bitmap(32,32))using(var a=Graphics.FromImage(b)){
      Theme.Fill(a,Theme.Line,5,6,22,22);Theme.Fill(a,Theme.Line,3,12,26,13);

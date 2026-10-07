@@ -1,0 +1,36 @@
+using System;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
+namespace DeskBuddy {
+ public static class Progression {
+  public static int Required(string name){switch(name){
+   case "딸기 리본":case "꽃 화분":case "민트 숲 벽지":case "복숭아 벽지":return 2;
+   case "둥근 안경":case "구름 러그":case "수제 쿠키":return 3;
+   case "별빛 모자":case "꽃 화관":case "축제 리본":case "축제 벽지":case "과일 한 접시":return 4;
+   case "하트 친구":case "포근한 목도리":case "헤드폰":case "별무늬 러그":case "딸기 러그":case "보랏빛 밤 벽지":case "별빛 조명":return 5;
+   case "토끼 머리띠":case "별빛 날개":case "작은 수족관":case "특별 도시락":return 7;
+   case "왕관":case "전설 왕관":case "왕실 벽지":case "왕실 만찬":return 10;
+   default:return 1;
+  }}
+  public static string Accessory(Data d){return Companions.Level(d)>=Required(d.Equipped)?d.Equipped:"기본";}
+  public static string Unlocks(int from,int to){string result="";foreach(int n in new[]{2,3,4,5,7,10})if(n>from&&n<=to)result+=(result.Length==0?"":"\n")+"Lv."+n+" · "+(n==2?"알 입양·작은 펫 키우기·똥 피하기":n==3?"댄스·공중제비·마법의 성 4·5탄":n==4?"축제 리본과 축제 벽지 구매":n==5?"펫과 함께 놀기":n==7?"별빛 효과": "전설 왕관·왕실 벽지 구매와 전설의 친구 칭호");var items=Living.Items.Where(i=>Required(i.Name)>from&&Required(i.Name)<=to).Select(i=>i.Name).ToArray();if(items.Length>0)result+=(result.Length==0?"":"\n")+"새 상점 품목: "+String.Join(" · ",items);return result;}
+  public static void Sparkles(Graphics g,Rectangle box,int frame,bool burst){if(!burst&&Companions.Level(Store.State)<7)return;for(int i=0;i<(burst?12:5);i++){int x=box.X+4+(i*47+frame*2)%Math.Max(1,box.Width-8),y=box.Y+4+(i*31+frame/2)%Math.Max(1,box.Height-8);Theme.Fill(g,Theme.Gold,x-3,y,7,1);Theme.Fill(g,Theme.Gold,x,y-3,1,7);}}
+  public static void Tests(){foreach(var item in Living.Items){int required=Required(item.Name);if(required<=1)continue;var locked=new Data{Coins=1000,Fullness=0,Happiness=0};AdminAccess.SetLevel(locked,required-1);string reason;bool bought=item.Kind=="음식"?Living.Feed(locked,item.Name,AppClock.Now,out reason):Living.Buy(locked,item.Name,out reason);if(bought||locked.Coins!=1000)throw new Exception("Shop gate: "+item.Name);AdminAccess.SetLevel(locked,required);bought=item.Kind=="음식"?Living.Feed(locked,item.Name,AppClock.Now,out reason):Living.Buy(locked,item.Name,out reason);if(!bought||locked.Coins!=1000-item.Price)throw new Exception("Shop unlock: "+item.Name);}var d=new Data{Coins=1000};string error;if(Living.Buy(d,"축제 리본",out error)||d.Coins!=1000)throw new Exception("Level item gate");AdminAccess.SetLevel(d,4);if(!Living.Buy(d,"축제 리본",out error)||Progression.Accessory(d)!="축제 리본")throw new Exception("Level four unlock");AdminAccess.SetLevel(d,1);if(Accessory(d)!="기본")throw new Exception("Level gear hides");AdminAccess.SetLevel(d,10);if(!Living.Buy(d,"전설 왕관",out error)||!Living.Buy(d,"왕실 벽지",out error))throw new Exception("Level ten unlock");if(!Unlocks(1,10).Contains("별빛")||Unlocks(7,7)!="")throw new Exception("Level announcements");}
+ }
+ public static class ProgressionUiTests {
+  static System.Collections.Generic.IEnumerable<Control> All(Control root){foreach(Control c in root.Controls){yield return c;foreach(var child in All(c))yield return child;}}
+  static Button Button(Form f,string text){return All(f).OfType<Button>().First(b=>b.Text==text);}
+  static void Check(bool ok,string text){if(!ok)throw new Exception(text);}
+  public static int Execute(){string oldPath=Store.FilePath;Data old=Store.State;string dir=Path.Combine(Path.GetTempPath(),"DeskBuddy-levels-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(dir);Store.FilePath=Path.Combine(dir,"data.json");Store.State=new Data{Coins=1000};try{Progression.Tests();using(var pet=new PetForm())using(var form=new MainForm(pet)){form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-2200,-1200);form.Show();Check(!Button(form,"댄스 · Lv.3").Enabled,"Dance locked");form.Navigate("미니게임");Check(!Button(form,"똥 피하기 · Lv.2").Enabled&&!Button(form,"마법의 성 4·5탄 · Lv.3 · 클리어 +100 G").Enabled,"Game level one gates");AdminAccess.SetLevel(Store.State,2);form.RefreshPage();Check(Button(form,"똥 피하기 시작").Enabled&&!Button(form,"마법의 성 4·5탄 · Lv.3 · 클리어 +100 G").Enabled,"Dodge level two unlock");AdminAccess.SetLevel(Store.State,3);form.RefreshPage();Check(Button(form,"마법의 성 4·5탄 · Lv.3 · 클리어 +100 G").Enabled,"Advanced castle unlock");form.Navigate("나의 방");AdminAccess.SetLevel(Store.State,3);form.RefreshPage();Check(Button(form,"댄스 · Lv.3").Enabled&&Button(form,"공중제비 · Lv.3").Enabled&&!Button(form,"함께 놀기 · Lv.5").Enabled,"Action unlocks");
+    foreach(string action in new[]{"댄스","공중제비"}){using(var before=pet.RenderSnapshot(true)){pet.SpecialAction(action);typeof(PetForm).GetMethod("Animate",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).Invoke(pet,null);using(var after=pet.RenderSnapshot(true)){bool different=false;for(int y=82;y<before.Height;y++)for(int x=0;x<before.Width;x++)if(before.GetPixel(x,y)!=after.GetPixel(x,y))different=true;Check(different,"Action animation "+action);}}}
+    string error;Companions.Adopt(Store.State,out error);AdminAccess.SetLevel(Store.State,5);form.RefreshPage();Check(Button(form,"함께 놀기 · Lv.5").Enabled,"Together unlock");pet.SpecialAction("함께 놀기");Check(Companions.Current(Store.State).Bond==1,"Together bond");
+    using(var image=new Bitmap(80,80))using(var g=Graphics.FromImage(image)){AdminAccess.SetLevel(Store.State,6);g.Clear(Color.Transparent);Progression.Sparkles(g,new Rectangle(0,0,80,80),0,false);Check(image.GetPixel(4,4).A==0,"Sparkles locked");AdminAccess.SetLevel(Store.State,7);Progression.Sparkles(g,new Rectangle(0,0,80,80),0,false);Check(image.GetPixel(4,4).A!=0,"Sparkles unlock");}
+    AdminAccess.SetLevel(Store.State,10);form.RefreshPage();Check(All(form).OfType<Label>().Any(l=>l.Text.Contains("전설의 친구")),"Level ten title");Check(Living.Buy(Store.State,"전설 왕관",out error)&&Living.Buy(Store.State,"왕실 벽지",out error),"Level ten store");Store.Save();Store.State=new Data();Store.Load();Check(Companions.Level(Store.State)==10&&Store.State.Equipped=="전설 왕관","Progression save reload");
+    var announce=typeof(PetForm).GetMethod("CheckLevelUp",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic);announce.Invoke(pet,null);int count=Application.OpenForms.Cast<Form>().Count(f=>f is GameAlertForm);Check(count>0,"Level up alert");announce.Invoke(pet,null);Check(Application.OpenForms.Cast<Form>().Count(f=>f is GameAlertForm)==count,"No duplicate level up");foreach(var alert in Application.OpenForms.Cast<Form>().Where(f=>f is GameAlertForm).ToArray())alert.Close();AdminAccess.SetLevel(Store.State,1);form.RefreshPage();Check(!Button(form,"댄스 · Lv.3").Enabled&&Progression.Accessory(Store.State)=="기본"&&Companions.Current(Store.State)==null,"Level downgrade locks");}
+    File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"level-validation.txt"),"PASS: level gates, dance/flip animation, joint play and bond, level 7 sparkle, level 10 title/store, one-time level-up announcement, downgrade locks, persistence.");return 0;
+   }catch(Exception ex){File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"level-validation.txt"),"FAIL: "+ex);return 1;}finally{Store.FilePath=oldPath;Store.State=old;foreach(string file in Directory.GetFiles(dir))File.Delete(file);Directory.Delete(dir);}
+  }
+ }
+}
