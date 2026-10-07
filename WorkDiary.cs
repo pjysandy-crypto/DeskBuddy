@@ -30,10 +30,26 @@ namespace DeskBuddy {
 		public string Id = Guid.NewGuid().ToString("N");
 		public string Date = "";
 		public string WorkMemo = "";
+		public bool Rewarded = false;
 		public List<DiaryProjectEntry> ProjectEntries = new List<DiaryProjectEntry>();
 	}
 
 	public static class DiaryCore {
+		public static bool RewardDiary(WorkDiaryItem diary, Data d, PetForm pet, MainForm parent) {
+			if (diary == null || diary.Rewarded) return false;
+			diary.Rewarded = true;
+			d.Coins += 25;
+			d.InteractionExperience += 15;
+			Store.Save();
+
+			if (pet != null) {
+				pet.Say("업무일지 작성 보상! +25 G, +15 EXP 획득!", false);
+			}
+			if (parent != null && !parent.IsDisposed) {
+				parent.RefreshPage();
+			}
+			return true;
+		}
 		public static void Normalize(Data d) {
 			if (d.Projects == null) d.Projects = new List<ProjectItem>();
 			if (d.Diaries == null) d.Diaries = new List<WorkDiaryItem>();
@@ -276,10 +292,17 @@ namespace DeskBuddy {
 			string singleCsv = GenerateCsv(d, d.Projects[0].Id);
 			if (!singleCsv.Contains("기본 프로젝트")) throw new Exception("Diary single CSV export");
 
+			var testDiary = GetOrCreateDiary(d, "2026-10-08");
+			int coinsBefore = d.Coins;
+			int xpBefore = Companions.Experience(d);
+			if (!RewardDiary(testDiary, d, null, null)) throw new Exception("Diary reward initial");
+			if (d.Coins != coinsBefore + 25 || Companions.Experience(d) != xpBefore + 15) throw new Exception("Diary reward amounts");
+			if (RewardDiary(testDiary, d, null, null)) throw new Exception("Diary duplicate reward prevented");
+
 			string json = new JavaScriptSerializer().Serialize(d);
 			var restored = new JavaScriptSerializer().Deserialize<Data>(json);
 			Normalize(restored);
-			if (restored.Diaries.Count != 1 || restored.Diaries[0].WorkMemo != "테스트 메모") throw new Exception("Diary JSON serialization");
+			if (restored.Diaries.Count != 2 || restored.Diaries[0].WorkMemo != "테스트 메모") throw new Exception("Diary JSON serialization");
 		}
 	}
 
@@ -490,7 +513,7 @@ namespace DeskBuddy {
 			Controls.Add(lblTitle);
 			y += 36;
 
-			var lblSub = Theme.Label("오늘의 To-Do 달성률과 프로젝트별 업무 메모를 한 곳에서 기록하세요.", 14, y, CARD_WIDTH, 22, 9, Theme.Muted);
+			var lblSub = Theme.Label("오늘의 To-Do 달성률과 프로젝트별 업무 메모를 한 곳에서 기록하세요. [일지 작성 보상: +25 G · +15 EXP]", 14, y, CARD_WIDTH, 22, 9, Theme.Muted);
 			Controls.Add(lblSub);
 			y += 28;
 
@@ -580,6 +603,22 @@ namespace DeskBuddy {
 			dateBar.Controls.Add(btnToday);
 
 			y += 56;
+
+			// 1-1. Reward Status Notice Bar
+			var rewardBar = new PixelPanel {
+				Location = new Point(0, y),
+				Size = new Size(CARD_WIDTH, 42),
+				BackColor = diary.Rewarded ? Color.FromArgb(236, 246, 238) : Color.FromArgb(255, 248, 230)
+			};
+			mainContent.Controls.Add(rewardBar);
+
+			string rewardMsg = diary.Rewarded
+				? "[보상 획득 완료] 이 날짜의 업무일지 작성 보상 (+25 G 코인 · +15 EXP 경험치)을 받았습니다!"
+				: "[일지 작성 보상] 오늘 업무일지(프로젝트 메모/일일 종합 메모)를 작성하면 +25 G와 +15 EXP가 지급됩니다!";
+			var lblRewardStatus = Theme.Label(rewardMsg, 14, 9, 640, 24, 9, diary.Rewarded ? Theme.Purple : Color.FromArgb(180, 110, 0));
+			rewardBar.Controls.Add(lblRewardStatus);
+
+			y += 52;
 
 			// 2. Section 1: 오늘 할 일 To-Do 달성률
 			List<TaskItem> tasks;
@@ -729,6 +768,7 @@ namespace DeskBuddy {
 					Progress = prog,
 					Content = ""
 				});
+				DiaryCore.RewardDiary(diary, Store.State, pet, parent);
 				Store.Save();
 				RenderDailyView();
 			}, true);
@@ -773,6 +813,7 @@ namespace DeskBuddy {
 							Progress = "진행 중",
 							Content = ""
 						});
+						DiaryCore.RewardDiary(diary, Store.State, pet, parent);
 						Store.Save();
 						RenderDailyView();
 					});
@@ -826,6 +867,9 @@ namespace DeskBuddy {
 
 						txtContent.Leave += (s, e) => {
 							entryRef.Content = txtContent.Text;
+							if (!String.IsNullOrWhiteSpace(txtContent.Text)) {
+								DiaryCore.RewardDiary(diary, Store.State, pet, parent);
+							}
 							Store.Save();
 						};
 
@@ -862,6 +906,9 @@ namespace DeskBuddy {
 
 			txtMemo.Leave += (s, e) => {
 				diary.WorkMemo = txtMemo.Text;
+				if (!String.IsNullOrWhiteSpace(txtMemo.Text)) {
+					DiaryCore.RewardDiary(diary, Store.State, pet, parent);
+				}
 				Store.Save();
 			};
 

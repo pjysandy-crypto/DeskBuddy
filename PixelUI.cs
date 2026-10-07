@@ -196,7 +196,7 @@ namespace DeskBuddy {
    string[] names={"나의 방","퀘스트 보드","업무일지","메모관리","집중 모험","미니게임","아이템 상점","캐릭터","펫 키우기","옵션"};
    string[] icons={"home","quest","diary","quest","focus","star","shop","pet","pet","options"};
    for(int i=0;i<pages.Length;i++){string target=pages[i];var b=(PixelButton)Theme.Button(names[i],16,156+i*38,180,35,(s,e)=>{if(target=="메모관리"){using(var memos=new StickyMemoForm(pet))memos.ShowDialog(this);RefreshPage();}else Navigate(target);});b.IconId=icons[i];sidebar.Controls.Add(b);nav[target]=b;}
-   sidebar.Controls.Add(Theme.Label("SAVE FILE  01",20,544,176,24,10,Theme.Muted));sidebar.Controls.Add(Theme.Label("일정 완료  +20 G\n집중 1분    +1 G",20,572,178, 40,10,Theme.Muted));
+   sidebar.Controls.Add(Theme.Label("SAVE FILE  01",20,538,176,18,9,Theme.Muted));sidebar.Controls.Add(Theme.Label("일정 완료  +20 G\n업무일지    +25 G\n집중 1분    +1 G",20,558,178,56,9,Theme.Muted));
    wallet=Theme.Label("",244, 70,752,36,11);Controls.Add(wallet);
    content=new Panel{Location=new Point(244,119),Size=new Size(752,588),BackColor=Theme.Bg,AutoScroll=true};Controls.Add(content);
    Controls.Add(Theme.Label("이동: 펫 드래그  /  메뉴: 더블클릭  /  창을 닫아도 펫은 남아있어요.",22,714,974,22,10,Theme.Muted));
