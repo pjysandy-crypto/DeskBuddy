@@ -39,6 +39,8 @@ namespace DeskBuddy {
  public class ScheduleNotice {public TaskItem Task;public bool Eve;public string Text;}
  public static class Scheduler {
   public static DateTime Due(TaskItem t){return AppClock.Decode(t.LocalDue,t.Due);}
+  public static DateTime End(TaskItem t){return Due(t).AddMinutes(t.DurationMinutes>0?t.DurationMinutes:t.AllDay?1440:0);}
+  public static string TimeRange(TaskItem t,DateTime start){if(t.AllDay)return "종일";if(t.DurationMinutes<=0)return start.ToString("HH:mm");DateTime end=start.AddMinutes(t.DurationMinutes);return start.ToString("HH:mm")+"~"+end.ToString("HH:mm")+(end.Date>start.Date?" (+"+(end.Date-start.Date).Days+"일)":"");}
   public static void SetDue(TaskItem t,DateTime value){t.Due=DateTime.SpecifyKind(value,DateTimeKind.Unspecified);t.LocalDue=AppClock.Encode(t.Due);}
   public static string RepeatLabel(TaskItem t){return t.Repeat=="평일"?"월~금":t.Repeat=="매주"?"매주 "+Due(t).ToString("ddd"):t.Repeat;}
   public static void Normalize(Data d){
@@ -57,14 +59,14 @@ namespace DeskBuddy {
    if(t.Repeat=="한 번"||t.Done)return false;
    bool adjusted=false;DateTime due=Due(t);
    if(t.Repeat=="평일"&&!Weekday(due)){Rearm(t,FirstAllowed(due,t.Repeat));due=Due(t);adjusted=true;}
-   if(due.Date>=now.Date)return adjusted;
+   if(due.Date>=now.Date||(t.DurationMinutes>0&&End(t)>now))return adjusted;
    DateTime day=now.Date;
    if(t.Repeat=="매주"){int days=(now.Date-due.Date).Days;day=due.Date.AddDays(((days+6)/7)*7);}
    Rearm(t,FirstAllowed(At(day,t),t.Repeat));return true;
   }
   static DateTime Next(TaskItem t,DateTime now){
    DateTime due=Due(t),day=due.Date.AddDays(t.Repeat=="매주"?7:1);
-   if(day<=now.Date)day=now.Date.AddDays(1);
+   if(At(day,t)<=now)day=now.Date.AddDays(At(now.Date,t)<=now?1:0);
    if(t.Repeat=="매주")while(day.DayOfWeek!=due.DayOfWeek)day=day.AddDays(1);
    return FirstAllowed(At(day,t),t.Repeat);
   }
@@ -93,7 +95,7 @@ namespace DeskBuddy {
   }
   public static TaskItem Appearance(Data d,DateTime now){
    return d.Tasks.Where(t=>!t.Done&&!String.IsNullOrEmpty(t.ScheduleImage)).Where(t=>{
-    DateTime due=Due(t),start=t.AllDay?due.Date:due,end=t.AllDay?due.Date.AddDays(1):due.AddMinutes(Math.Max(1,t.AppearanceMinutes));
+    DateTime due=Due(t),start=t.AllDay?due.Date:due,end=t.DurationMinutes>0?End(t):t.AllDay?due.Date.AddDays(1):due.AddMinutes(Math.Max(1,t.AppearanceMinutes));
     return now>=start&&now<end;
    }).OrderByDescending(t=>t.AllDay).ThenByDescending(t=>Due(t)).FirstOrDefault();
   }

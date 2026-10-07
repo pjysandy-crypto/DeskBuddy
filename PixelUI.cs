@@ -174,7 +174,7 @@ namespace DeskBuddy {
 
  public class MainForm:Form {
   PetForm pet;Panel content,sidebar;Label wallet,countdown,friend;Timer live=new Timer{Interval=1000};
-  string page="나의 방",shopTab="캐릭터";ListBox taskList;Dictionary<string,Button> nav=new Dictionary<string,Button>();Point drag;
+  DateTime questDate=DateTime.MinValue;string page="나의 방",shopTab="캐릭터";ListBox taskList;Dictionary<string,Button> nav=new Dictionary<string,Button>();Point drag;
   public MainForm(PetForm owner){
    pet=owner;Icon=AppIdentity.Icon;Text="DeskBuddy · 작은 업무 모험";AutoScaleMode=AutoScaleMode.None;ClientSize=new Size(1024,744);
    StartPosition=FormStartPosition.CenterScreen;FormBorderStyle=FormBorderStyle.None;BackColor=Theme.Bg;Font=Theme.Font(10);DoubleBuffered=true;
@@ -187,15 +187,15 @@ namespace DeskBuddy {
    sidebar=new PixelPanel{Location=new Point(12, 70),Size=new Size(212,636),BackColor=Color.FromArgb(237,222,190)};Controls.Add(sidebar);
    sidebar.Controls.Add(new PetPortrait{Location=new Point(16,14),Size=new Size(180,104),BackColor=Theme.Cream});
    friend=Theme.Label(Store.State.PetName,16,124,180,26,11);friend.TextAlign=ContentAlignment.MiddleCenter;sidebar.Controls.Add(friend);
-   string[] pages={"나의 방","오늘의 업무","집중 스튜디오","미니게임","코인 상점","나의 캐릭터","펫 키우기","설정 / 소개"};
-   string[] names={"나의 방","퀘스트 보드","집중 모험","미니게임","아이템 상점","캐릭터","펫 키우기","옵션"};
-   string[] icons={"home","quest","focus","star","shop","pet","pet","options"};
-   for(int i=0;i<pages.Length;i++){string target=pages[i];var b=(PixelButton)Theme.Button(names[i],16,171+i*45,180,42,(s,e)=>Navigate(target));b.IconId=icons[i];sidebar.Controls.Add(b);nav[target]=b;}
-   sidebar.Controls.Add(Theme.Label("SAVE FILE  01",20,546,176,24,10,Theme.Muted));sidebar.Controls.Add(Theme.Label("일정 완료  +20 G\n집중 1분    +1 G",20,576,178, 40,10,Theme.Muted));
+   string[] pages={"나의 방","오늘의 업무","메모관리","집중 스튜디오","미니게임","코인 상점","나의 캐릭터","펫 키우기","설정 / 소개"};
+   string[] names={"나의 방","퀘스트 보드","메모관리","집중 모험","미니게임","아이템 상점","캐릭터","펫 키우기","옵션"};
+   string[] icons={"home","quest","quest","focus","star","shop","pet","pet","options"};
+   for(int i=0;i<pages.Length;i++){string target=pages[i];var b=(PixelButton)Theme.Button(names[i],16,171+i*42,180,39,(s,e)=>{if(target=="메모관리"){using(var memos=new StickyMemoForm(pet))memos.ShowDialog(this);RefreshPage();}else Navigate(target);});b.IconId=icons[i];sidebar.Controls.Add(b);nav[target]=b;}
+   sidebar.Controls.Add(Theme.Label("SAVE FILE  01",20,558,176,24,10,Theme.Muted));sidebar.Controls.Add(Theme.Label("일정 완료  +20 G\n집중 1분    +1 G",20,588,178, 40,10,Theme.Muted));
    wallet=Theme.Label("",244, 70,752,36,11);Controls.Add(wallet);
    content=new Panel{Location=new Point(244,119),Size=new Size(752,588),BackColor=Theme.Bg,AutoScroll=true};Controls.Add(content);
    Controls.Add(Theme.Label("이동: 펫 드래그  /  메뉴: 더블클릭  /  창을 닫아도 펫은 남아있어요.",22,714,974,22,10,Theme.Muted));
-   RefreshPage();live.Tick+=(s,e)=>{if(countdown!=null && !countdown.IsDisposed){var remaining=Store.State.FocusEnd-AppClock.Now;countdown.Text=Store.State.FocusEnd==DateTime.MinValue?"READY":String.Format("{0:00}:{1:00}",Math.Max(0,(int)remaining.TotalMinutes),Math.Max(0,remaining.Seconds));}};live.Start();
+   RefreshPage();live.Tick+=(s,e)=>{if(page=="오늘의 업무"&&questDate!=AppClock.Now.Date)RefreshPage();if(countdown!=null && !countdown.IsDisposed){var remaining=Store.State.FocusEnd-AppClock.Now;countdown.Text=FocusTimerArt.Remaining(Store.State,AppClock.Now);}};live.Start();
    FormClosed+=(s,e)=>{live.Dispose();};
   }
   
@@ -243,34 +243,35 @@ namespace DeskBuddy {
    if(little==null){var adopt=Theme.Button("알 입양하기",130,90,250,40,(s,e)=>CompanionAction(0),true);adopt.Enabled=Companions.Level(Store.State)>=2;card.Controls.Add(adopt);}else{card.Controls.Add(Theme.Button(little.Growth<3?"알 보살피기 5 G":"펫 놀아주기 5 G",130,90,250,40,(s,e)=>CompanionAction(1),true));card.Controls.Add(Theme.Button(little.Growth<3?"영양 주기 8 G":"펫 밥 주기 8 G",396,90,250,40,(s,e)=>CompanionAction(2)));}
    L("각 캐릭터의 펫은 따로 자라요. 돌봄은 1분마다 가능해요.",0,280,720,28,10,Theme.Muted);var guide=Card(0,329,720,147);guide.Controls.Add(Theme.Label("알 → 아기 펫 → 다 자란 펫",20,16,680,30,13));guide.Controls.Add(Theme.Label("돌봄 / 놀아주기 5 G · 영양 / 밥 주기 8 G",20,55,680,26,10));guide.Controls.Add(Theme.Label("찌오의 펫은 반짝이는 둥근 아기 새로 자라요.",20,91,680,26,10,Theme.Muted)); }
   void CompanionAction(int action){string snapshot=new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(Store.State),error;bool ok=action==0?Companions.Adopt(Store.State,out error):Companions.Care(Store.State,action==2,AppClock.Now,out error);if(!ok){GameAlert.Show(error,"작은 펫 키우기");return;}if(!Store.Save()){Store.State=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Data>(snapshot);return;}pet.ApplyPetSize();pet.Say(action==0?"새 알이 생겼어! 함께 키워보자~":"작은 펫이 무럭무럭 자라고 있어!",false);RefreshPage();}
-  void EditSchedule(TaskItem item,string preset){using(var editor=new ScheduleEditor(item,preset)){if(editor.ShowDialog(this)==DialogResult.OK)RefreshPage();}}
-  void Tasks(){
-   Title("QUEST BOARD","일정과 퀘스트","한국시간 · "+AppClock.Now.ToString("MM/dd (ddd) HH:mm")+" · 일정 +20 G / 야근 -20 G");
+  void EditSchedule(TaskItem item,string preset){if(GoogleCalendar.Imported(item)){GameAlert.Show("구글에서 가져온 일정은 구글 캘린더에서 수정해주세요.");return;}using(var editor=new ScheduleEditor(item,preset)){if(editor.ShowDialog(this)==DialogResult.OK)RefreshPage();}}
+  void Tasks(){ questDate=AppClock.Now.Date;
+   Title("QUEST BOARD","오늘의 일정과 퀘스트","한국시간 · "+AppClock.Now.ToString("MM/dd (ddd) HH:mm")+" · 일정 +20 G / 야근 -20 G");
    B("+ 일정 추가",0,111,190,44,(s,e)=>EditSchedule(null,""),true);
    B("출근",202,111,110,44,(s,e)=>EditSchedule(null,"출근"));
    B("퇴근",324,111,110,44,(s,e)=>EditSchedule(null,"퇴근"));
    B("휴가",446,111,110,44,(s,e)=>EditSchedule(null,"휴가"));
    B("야근",568,111,152,44,(s,e)=>EditSchedule(null,"야근"));
-   L("달력으로 날짜 선택 · 시간 직접 입력 · 반복 · 전날 알림 · 일정별 모습",0,167,744,30,10,Theme.Muted);
+   B("달력 보기",0,165,170,34,(s,e)=>{using(var calendar=new ScheduleCalendarForm(pet))calendar.ShowDialog(this);RefreshPage();},true);
+   L("날짜별 일정 · 반복 예정 · Google 일정도 함께",184,167,550,30,10,Theme.Muted);
    var board=Card(0,207,744,280);
    taskList=new ListBox{Location=new Point(12,12),Size=new Size(720,256),BorderStyle=BorderStyle.None,Font=Theme.Font(10),DrawMode=DrawMode.OwnerDrawFixed,ItemHeight=64,BackColor=Theme.Cream};
-   foreach(var t in Store.State.Tasks.OrderBy(t=>t.Done).ThenBy(t=>Scheduler.Due(t)))taskList.Items.Add(t);
+   foreach(var t in Store.State.Tasks.Where(t=>Scheduler.Due(t)<questDate.AddDays(1)&&(Scheduler.Due(t).Date==questDate||Scheduler.End(t)>questDate)).OrderBy(t=>t.Done).ThenBy(t=>Scheduler.Due(t)))taskList.Items.Add(t);
    taskList.DrawItem+=(s,e)=>{if(e.Index<0)return;var t=(TaskItem)taskList.Items[e.Index];Theme.Fill(e.Graphics,(e.State&DrawItemState.Selected)!=0?Color.FromArgb(243,218,164):Theme.Cream,e.Bounds.X,e.Bounds.Y,e.Bounds.Width,e.Bounds.Height);
     PixelIcons.Draw(e.Graphics,t.Done?"star":"quest",new Point(10,e.Bounds.Y+16),2);
     Theme.Text(e.Graphics,t.Title,taskList.Font,t.Done?Theme.Muted:Theme.Ink,new Rectangle(42,e.Bounds.Y+3,560,24));
-    Theme.Text(e.Graphics,Scheduler.Due(t).ToString("MM/dd (ddd) HH:mm")+" · "+t.Category+" · "+Scheduler.RepeatLabel(t),taskList.Font,Theme.Muted,new Rectangle(42,e.Bounds.Y+26,650,20));
+    Theme.Text(e.Graphics,Scheduler.Due(t).ToString("MM/dd (ddd) ")+Scheduler.TimeRange(t,Scheduler.Due(t))+" · "+t.Category+" · "+(GoogleCalendar.Imported(t)?"Google":Scheduler.RepeatLabel(t)),taskList.Font,Theme.Muted,new Rectangle(42,e.Bounds.Y+26,650,20));
     Theme.Text(e.Graphics,(t.AllDay?"종일  ":"")+(t.EveReminder?"전날 "+t.EveTime+" 알림  ":"")+(!String.IsNullOrEmpty(t.ScheduleImage)?"모습 변경":""),Theme.Font(8),Theme.Purple,new Rectangle(42,e.Bounds.Y+45,620,18));
     Theme.Text(e.Graphics,t.Done?"CLEAR":Scheduler.Overtime(t)?"-20 G":"+20 G",taskList.Font,t.Done?Theme.Purple:Scheduler.Overtime(t)?Color.FromArgb(177,90,105):Theme.Ink,new Rectangle(590,e.Bounds.Y+3,110,24),ContentAlignment.MiddleRight);
     Theme.Fill(e.Graphics,Theme.Light,4,e.Bounds.Bottom-2,e.Bounds.Width-8,1);
    };board.Controls.Add(taskList);
    taskList.DoubleClick+=(s,e)=>{var t=taskList.SelectedItem as TaskItem;if(t!=null)EditSchedule(t,"");};
-   if(taskList.Items.Count==0)board.Controls.Add(Theme.Label("첫 일정을 등록해보세요!",28,80,680,50,14,Theme.Muted));
+   if(taskList.Items.Count==0)board.Controls.Add(Theme.Label("오늘은 일정이 없어요.\n다른 날짜는 달력에서 확인하세요!",28,80,680,50,14,Theme.Muted));
    var completeButton=B("완료 +20 코인",0,503,234,42,(s,e)=>{var t=taskList.SelectedItem as TaskItem;if(t==null)return;int before=Store.State.Coins;if(Rules.Complete(t,Store.State)){Store.Save();int delta=Store.State.Coins-before;pet.Say(Scheduler.Overtime(t)?"야근 끝! 이제 푹 쉬자. "+delta+" G":"QUEST CLEAR! +20 G",false);RefreshPage();}else GameAlert.Show("이미 완료했거나 다음 날짜의 반복 일정이에요.");},true);
    taskList.SelectedIndexChanged+=(s,e)=>{if(!completeButton.IsDisposed){var t=taskList.SelectedItem as TaskItem;completeButton.Text=t!=null&&Scheduler.Overtime(t)?"야근 완료 -20 코인":"완료 +20 코인";}};
    B("일정 수정",250,503,234,42,(s,e)=>{var t=taskList.SelectedItem as TaskItem;if(t!=null)EditSchedule(t,"");});
    B("10분 뒤 알림",510,503,234,42,(s,e)=>{var t=taskList.SelectedItem as TaskItem;if(t==null||t.Done)return;Scheduler.Snooze(t,AppClock.Now);Store.Save();RefreshPage();});
    B("이번 반복 건너뛰기",0,551,360,32,(s,e)=>{var t=taskList.SelectedItem as TaskItem;if(t!=null&&Scheduler.Skip(t,AppClock.Now)){Store.Save();RefreshPage();}});
-   B("일정 삭제",384,551,360,32,(s,e)=>{var t=taskList.SelectedItem as TaskItem;if(t!=null&&GameAlert.Show(t.Repeat=="한 번"?"일정을 삭제할까요?":"반복 일정 전체를 삭제할까요?","일정 삭제",MessageBoxButtons.YesNo)==DialogResult.Yes){Store.State.Tasks.Remove(t);Store.Save();RefreshPage();}});
+   B("일정 삭제",384,551,360,32,(s,e)=>{var t=taskList.SelectedItem as TaskItem;if(GoogleCalendar.Imported(t)){GameAlert.Show("구글 캘린더에서 삭제하면 다음 갱신에 반영돼요.");return;}if(t!=null&&GameAlert.Show(t.Repeat=="한 번"?"일정을 삭제할까요?":"반복 일정 전체를 삭제할까요?","일정 삭제",MessageBoxButtons.YesNo)==DialogResult.Yes){Store.State.Tasks.Remove(t);Store.Save();RefreshPage();}});
   }
 
   void FocusPage(){
@@ -279,8 +280,8 @@ namespace DeskBuddy {
    var timer=Card(0,361,744,80);countdown=Theme.Label("READY",16,14,320,52,22,Theme.Purple);timer.Controls.Add(countdown);
    timer.Controls.Add(Theme.Label("집중 시간",360,24,140, 28));
    var minutes=new NumericUpDown{Location=new Point(520,24),Size=new Size(193, 30),Minimum=1,Maximum=120,Value=25,BackColor=Theme.Cream,ForeColor=Theme.Ink,Font=Theme.Font(10)};timer.Controls.Add(minutes);
-   B("집중 시작",0,459,360, 50,(s,e)=>{if(Store.State.FocusEnd!=DateTime.MinValue){GameAlert.Show("이미 집중 중이에요.");return;}Store.State.SessionMinutes=(int)minutes.Value;Store.State.FocusEnd=AppClock.Now.AddMinutes((int)minutes.Value);Store.Save();pet.Say("집중 모험 시작! 함께 힘내보자.",false);RefreshPage();},true);
-   B("집중 취소",376,459,368, 50,(s,e)=>{if(Store.State.FocusEnd==DateTime.MinValue)return;if(GameAlert.Show("모험을 취소할까요? 완료 보상은 지급되지 않아요.","집중 취소",MessageBoxButtons.YesNo)==DialogResult.Yes){Store.State.FocusEnd=DateTime.MinValue;Store.State.SessionMinutes=0;Store.Save();RefreshPage();}});
+   B("집중 시작",0,459,360, 50,(s,e)=>{if(Store.State.FocusEnd!=DateTime.MinValue){GameAlert.Show("이미 집중 중이에요.");return;}Store.State.SessionMinutes=(int)minutes.Value;Store.State.FocusEnd=AppClock.Now.AddMinutes((int)minutes.Value);Store.Save();pet.ApplyPetSize();pet.Say("집중 모험 시작! 함께 힘내보자.",false);RefreshPage();},true);
+   B("집중 취소",376,459,368, 50,(s,e)=>{if(Store.State.FocusEnd==DateTime.MinValue)return;if(GameAlert.Show("모험을 취소할까요? 완료 보상은 지급되지 않아요.","집중 취소",MessageBoxButtons.YesNo)==DialogResult.Yes){Store.State.FocusEnd=DateTime.MinValue;Store.State.SessionMinutes=0;Store.Save();pet.ApplyPetSize();RefreshPage();}});
    L("완료한 모험 "+Store.State.FocusCount+"회  /  누적 집중 "+Store.State.FocusMinutes+"분",0,535,744, 30,10,Theme.Muted);
   }
 
@@ -336,10 +337,12 @@ namespace DeskBuddy {
    sizing.Controls.Add(Theme.Button("기본",607,16,98,38,(s,e)=>slider.Value=140));
    var bubbleSizing=Card(0,519,720,70);bubbleSizing.Controls.Add(Theme.Label("말풍선 크기",16,20,108,30));bubbleSizing.Controls.Add(Theme.Button("미리보기",120,16,74,38,(s,e)=>{using(var preview=new SizePreviewForm(pet))preview.ShowDialog(this);RefreshPage();}));
    var bubbleSlider=new PixelSizeSlider{Minimum=60,Maximum=160,Location=new Point(197,17),Size=new Size(315,36),Value=Store.State.BubbleScale};var bubbleLabel=Theme.Label(Store.State.BubbleScale+" %",525,20,80,30);bubbleSizing.Controls.Add(bubbleSlider);bubbleSizing.Controls.Add(bubbleLabel);bubbleSlider.ValueChanged+=(s,e)=>{Store.State.BubbleScale=bubbleSlider.Value;pet.ApplyPetSize();bubbleLabel.Text=bubbleSlider.Value+" %";Store.Save();};bubbleSizing.Controls.Add(Theme.Button("기본",607,16,98,38,(s,e)=>bubbleSlider.Value=100));
-   L("기본 친구를 고르면 이름도 함께 바뀌어요.",0,607,495,28,10,Theme.Muted);
-   B("샘플 여러 개 추가",510,603,210,38,(s,e)=>AddSamples());
+   var timerSizing=Card(0,601,720,70);timerSizing.Controls.Add(Theme.Label("집중 타이머",16,20,108,30));timerSizing.Controls.Add(Theme.Button("미리보기",120,16,74,38,(s,e)=>{using(var preview=new SizePreviewForm(pet))preview.ShowDialog(this);RefreshPage();}));
+   var timerSlider=new PixelSizeSlider{Minimum=60,Maximum=180,Location=new Point(197,17),Size=new Size(315,36),Value=Store.State.FocusTimerScale};var timerLabel=Theme.Label(timerSlider.Value+" %",525,20,80,30);timerSizing.Controls.Add(timerSlider);timerSizing.Controls.Add(timerLabel);timerSlider.ValueChanged+=(s,e)=>{Store.State.FocusTimerScale=timerSlider.Value;pet.ApplyPetSize();timerLabel.Text=timerSlider.Value+" %";Store.Save();};timerSizing.Controls.Add(Theme.Button("기본",607,16,98,38,(s,e)=>timerSlider.Value=100));
+   L("기본 친구를 고르면 이름도 함께 바뀌어요.",0,689,495,28,10,Theme.Muted);
+   B("샘플 여러 개 추가",510,685,210,38,(s,e)=>AddSamples());
    int index=0;foreach(string sample in CharacterLibrary.Samples()){
-    string path=sample;int x=index%6*120,y=index<6?111:667+(index-6)/6*166;bool selected=Store.State.ImagePath==path||(Store.State.ImagePath==""&&path==CharacterLibrary.Default);
+    string path=sample;int x=index%6*120,y=index<6?111:749+(index-6)/6*166;bool selected=Store.State.ImagePath==path||(Store.State.ImagePath==""&&path==CharacterLibrary.Default);
     var card=Card(x,y,112,160,selected?Theme.Gold:Theme.Cream);card.Controls.Add(new SamplePortrait(path){Location=new Point(6,6),Size=new Size(100,112)});
     card.Controls.Add(Theme.Button(selected?"선택됨":CharacterLibrary.Label(path),6,121,100,33,(s,e)=>SelectCharacter(path)));index++;
    }
@@ -384,6 +387,7 @@ namespace DeskBuddy {
    }));
    B("말풍선 알림 테스트",0,424,360, 46,(s,e)=>pet.Say("회의 준비할 시간! 자료 챙겼어?",true),true);
    B("DeskBuddy 완전 종료",376,424,368, 46,(s,e)=>pet.Quit());
+   B("구글 캘린더 연결",0,648,720,46,(s,e)=>{using(var calendar=new GoogleCalendarForm())calendar.ShowDialog(this);RefreshPage();});
    B("관리자 설정",0,590,720,46,(s,e)=>{using(var admin=new AdminForm())admin.ShowDialog(this);pet.ApplyPetSize();RefreshPage();});
    var note=Card(0,488,744,88,Color.FromArgb(233,222,195));note.Controls.Add(Theme.Label("TIP / 창을 닫아도 바탕화면 펫은 남아요.\n완전 종료는 위 버튼으로! 알림은 앱 실행 중에 동작해요.",18, 16,704, 60,10,Theme.Muted));
   }

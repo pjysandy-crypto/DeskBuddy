@@ -25,14 +25,14 @@ namespace DeskBuddy {
 
  public class TaskItem {
   public string Id=Guid.NewGuid().ToString(); public string Title=""; public DateTime Due;
-  public bool Done; public bool Notified; public string Category="업무"; public string LocalDue="", Repeat="한 번", AnchorTime="", ScheduleImage="", EveTime="18:00", SnoozeLocal="", LastCompletedLocal=""; public bool AllDay, EveReminder, EveNotified; public int AppearanceMinutes=30;
+  public bool Done; public bool Notified; public string Category="업무"; public string LocalDue="", Repeat="한 번", AnchorTime="", ScheduleImage="", EveTime="18:00", SnoozeLocal="", LastCompletedLocal=""; public bool AllDay, EveReminder, EveNotified; public int AppearanceMinutes=30; public int DurationMinutes;
  }
  public class Data {
   public int Fullness=70,Happiness=70,MealsGiven;public string CareLocal=AppClock.Encode(AppClock.Now),LastFood="",LastFedLocal="",RoomWallpaper="기본 벽지",RoomRug="기본 러그",RoomDecoration="기본 장식";
   public List<string> RoomOwned=new List<string>{"기본 벽지","기본 러그","기본 장식"};
   public int Coins=30, Completed, FocusCount, FocusMinutes,ExperienceAdjustment;
-  public string PetName="스누피", ImagePath="", Equipped="기본"; public int PixelSize=3; public int PetSize=140; public int BubbleScale=100; public Dictionary<string,LittlePet> Companions=new Dictionary<string,LittlePet>();
-  public List<string> Owned=new List<string>{"기본"}; public List<TaskItem> Tasks=new List<TaskItem>();
+  public string PetName="스누피", ImagePath="", Equipped="기본"; public int PixelSize=3; public int PetSize=140; public int BubbleScale=100; public int FocusTimerScale=100; public Dictionary<string,LittlePet> Companions=new Dictionary<string,LittlePet>();
+  public List<MemoNote> Memos=new List<MemoNote>(); public List<string> Owned=new List<string>{"기본"}; public List<TaskItem> Tasks=new List<TaskItem>();
   public bool Wander=true, Quiet=false; public bool Cartwheels=true; public List<string> CharacterSamples=new List<string>(); public DateTime FocusEnd=DateTime.MinValue; public string FocusEndLocal=""; public int SessionMinutes; public string GamesDate=""; public int GamesPlayed;
  }
  public static class Store {
@@ -42,7 +42,7 @@ namespace DeskBuddy {
    if(!File.Exists(FilePath))return;
    try { State=new JavaScriptSerializer().Deserialize<Data>(File.ReadAllText(FilePath,Encoding.UTF8));
     if(State==null || State.Tasks==null || State.Owned==null)throw new Exception("Invalid data");
-    Scheduler.Normalize(State);Living.Normalize(State);State.BubbleScale=Math.Max(60,Math.Min(160,State.BubbleScale));if(State.Companions==null)State.Companions=new Dictionary<string,LittlePet>(); State.PixelSize=Math.Max(1,Math.Min(5,State.PixelSize));Store.State.PetSize=Math.Max(40,Math.Min(320,Store.State.PetSize));
+    Scheduler.Normalize(State);Living.Normalize(State);StickyMemos.Normalize(State);State.FocusTimerScale=Math.Max(60,Math.Min(180,State.FocusTimerScale));State.BubbleScale=Math.Max(60,Math.Min(160,State.BubbleScale));if(State.Companions==null)State.Companions=new Dictionary<string,LittlePet>(); State.PixelSize=Math.Max(1,Math.Min(5,State.PixelSize));Store.State.PetSize=Math.Max(40,Math.Min(320,Store.State.PetSize));
    } catch { State=new Data(); Warning="저장 데이터를 읽지 못해 새 데이터를 사용합니다. 원본은 별도 파일로 보관합니다.";
     File.Copy(FilePath,FilePath+".damaged-"+AppClock.Now.ToString("yyyyMMddHHmmss"),true); }
   }
@@ -193,14 +193,22 @@ namespace DeskBuddy {
   public void StartCastleAdvanced(){if(Companions.Level(Store.State)<3){GameAlert.Show("레벨 3부터 마법의 성 4·5탄을 할 수 있어요.");return;}StartGame(()=>new CastleForm(this,true));}
   public void StartCastle(){StartGame(()=>new CastleForm(this));}
   void StartGame(Func<Form> create){
-   if(Store.State.FocusEnd!=DateTime.MinValue){GameAlert.Show("집중 모험을 끝내고 한 판 해요!");return;}
-   if(game!=null&&!game.IsDisposed){game.Activate();return;}
-   if(dashboard!=null&&!dashboard.IsDisposed)dashboard.Hide();Hide();cartwheelFrame=-1;
-   game=create();game.FormClosed+=(s,e)=>{game=null;if(!shuttingDown){Show();RenderLayered();OpenDashboard();}};game.Show();game.Activate();
+   if(Store.State.FocusEnd!=DateTime.MinValue){if(Rules.FinishFocus(Store.State,AppClock.Now)){Store.Save();ApplyPetSize();}else{GameAlert.Show("집중 모험을 끝내고 한 판 해요!");return;}}
+   if(game!=null&&!game.IsDisposed){game.WindowState=FormWindowState.Normal;game.Show();game.BringToFront();game.Activate();return;}
+   try{
+    game=create();game.FormClosed+=(s,e)=>{game=null;if(!shuttingDown){Show();RenderLayered();OpenDashboard();}};
+    if(dashboard!=null&&!dashboard.IsDisposed)dashboard.Hide();Hide();cartwheelFrame=-1;
+    game.WindowState=FormWindowState.Normal;game.TopMost=true;game.Show();game.BringToFront();game.Activate();game.TopMost=false;game.Focus();
+    var castle=game as CastleForm;Startup.Log("Game opened: "+game.GetType().Name+(castle==null?"":" stage="+castle.Engine.Stage)+" visible="+game.Visible);
+   }catch(Exception ex){if(game!=null){game.Dispose();game=null;}Show();RenderLayered();OpenDashboard();Startup.Log("Game launch failed: "+ex);GameAlert.Show("게임을 열지 못했어요.\n"+ex.Message,"게임 실행",MessageBoxButtons.OK,MessageBoxIcon.Error);}
   }
-
   int BubbleSpace{get{return 12+(int)(70*Store.State.BubbleScale/100.0);}}
-  Size PetWindowSize(){int little=Companions.Current(Store.State)==null?0:Companions.SizeFor(Store.State.PetSize);return new Size(Math.Max(14+(int)(266*Store.State.BubbleScale/100.0),Store.State.PetSize+little+40),BubbleSpace+Store.State.PetSize+8);}
+  int FocusTimerHeight{get{return (int)Math.Round(40*Store.State.FocusTimerScale/100.0)+8;}}
+  int FocusTimerSpace{get{return Store.State.FocusEnd==DateTime.MinValue?0:FocusTimerHeight;}}
+  public Size PreviewSize{get{return PetWindowSize(true);}}
+  public int MemoAvailable{get{return MemoBudget(false);}}
+  int MemoBudget(bool preview){return Screen.FromControl(this).WorkingArea.Height-BubbleSpace-(preview?FocusTimerHeight:FocusTimerSpace)-Store.State.PetSize-8;}
+  Size PetWindowSize(bool preview=false){int little=Companions.Current(Store.State)==null?0:Companions.SizeFor(Store.State.PetSize);return new Size(Math.Max(StickyMemos.Pinned(Store.State).Count>0?266:0,Math.Max(14+(int)(266*Store.State.BubbleScale/100.0),Math.Max(Store.State.PetSize+little+40,(int)Math.Round(140*Store.State.FocusTimerScale/100.0)+14))),BubbleSpace+StickyMemos.Space(Store.State,MemoBudget(preview))+(preview?FocusTimerHeight:FocusTimerSpace)+Store.State.PetSize+8);}
   public void ApplyPetSize(){
    int size=Math.Max(40,Math.Min(320,Store.State.PetSize));Store.State.PetSize=size;
    int bottom=Bottom,center=Left+Width/2;Size=PetWindowSize();
@@ -216,11 +224,11 @@ namespace DeskBuddy {
    bubble=message;bubbleUntil=AppClock.Now.AddSeconds(18);RenderLayered();
    if(notify && !Store.State.Quiet){tray.BalloonTipTitle=Store.State.PetName+"의 업무 알림";tray.BalloonTipText=message;tray.ShowBalloonTip(5000);}
   }
-  void TickClock(){
+  void TickClock(){ GoogleCalendar.Poll();
    if(Startup.OpenRequest!=null && Startup.OpenRequest.WaitOne(0)){Show();OpenDashboard();}
    DateTime now=AppClock.Now;bool changed=false;bool careChanged=Living.UpdateCare(Store.State,now);
    var notices=Scheduler.Poll(Store.State,now,out changed);foreach(var notice in notices)pendingNotices.Enqueue(notice);if(pendingNotices.Count>0&&now>=nextNotice){var notice=pendingNotices.Dequeue();if(Store.State.Tasks.Any(t=>t.Id==notice.Task.Id&&!t.Done)){Say(notice.Text,true);nextNotice=now.AddSeconds(19);noticePose=notice.Task.Id==ignoredAppearanceId?"":notice.Task.ScheduleImage;noticePoseUntil=now.AddSeconds(18);}}var appearance=Scheduler.Appearance(Store.State,now);if(appearance==null)ignoredAppearanceId="";else if(appearance.Id==ignoredAppearanceId)appearance=null;if(PetArt.SetScheduleImage(now<noticePoseUntil&&!String.IsNullOrEmpty(noticePose)?noticePose:appearance==null?"":appearance.ScheduleImage)){RenderLayered();if(dashboard!=null&&!dashboard.IsDisposed)dashboard.Invalidate(true);}
-   if(Rules.FinishFocus(Store.State,now)){Say("집중 완료! 코인을 받았어요.\n잠깐 스트레칭할까요?",true);changed=true;}
+   if(Rules.FinishFocus(Store.State,now)){ApplyPetSize();Say("집중 완료! 코인을 받았어요.\n잠깐 스트레칭할까요?",true);changed=true;}
    CheckLevelUp();if(changed||careChanged){Store.Save();if(dashboard!=null && !dashboard.IsDisposed)dashboard.RefreshPage();}
    if(game==null && !Store.State.Quiet && now.Second==0 && now.Minute%30==0 && now.Hour>=9 && now.Hour<19 && Store.State.FocusEnd==DateTime.MinValue)
     Say(random.Next(2)==0?"물 한 잔 마시고 올까요?":"어깨를 펴고 잠깐 쉬어요!",false);
@@ -228,7 +236,7 @@ namespace DeskBuddy {
   protected override CreateParams CreateParams{get{var cp=base.CreateParams;cp.ExStyle|=0x80000;return cp;}}
   protected override void OnPaintBackground(PaintEventArgs e){}
   protected override void OnPaint(PaintEventArgs e){DrawFrame(e.Graphics);}
-  public Bitmap RenderSnapshot(bool preview=false){var image=new Bitmap(Width,Height,PixelFormat.Format32bppPArgb);using(var g=Graphics.FromImage(image)){g.Clear(Color.Transparent);DrawFrame(g,preview);}return image;}
+  public Bitmap RenderSnapshot(bool preview=false){var dimensions=PetWindowSize(preview);var image=new Bitmap(dimensions.Width,dimensions.Height,PixelFormat.Format32bppPArgb);using(var g=Graphics.FromImage(image)){g.Clear(Color.Transparent);DrawFrame(g,preview);}return image;}
   void RenderLayered(){if(!IsHandleCreated||IsDisposed)return;using(var image=RenderSnapshot())AlphaWindow.Update(Handle,Location,image);}
   public void RenderLayeredForTest(){using(var image=RenderSnapshot())AlphaWindow.Update(Handle,Location,image);}
   void DrawFrame(Graphics graphics,bool preview=false){
@@ -238,11 +246,14 @@ namespace DeskBuddy {
     float scale=Store.State.BubbleScale/100f;int padX=(int)Math.Round(10*scale),padY=(int)Math.Round(8*scale);var textBox=new Rectangle(r.X+padX,r.Y+padY,r.Width-2*padX,r.Height-2*padY);string caption=preview?"일정 알림! 잠깐 쉬고 함께 시작해요.":bubble;using(var f=Theme.BubbleFont(graphics,caption,textBox,Store.State.BubbleScale))Theme.Text(graphics,caption,f,Theme.Ink,textBox,ContentAlignment.MiddleCenter);
     using(var b=new SolidBrush(Color.FromArgb(255,253,246)))graphics.FillPolygon(b,new[]{new Point(Width/2-8,BubbleSpace-7),new Point(Width/2+8,BubbleSpace-7),new Point(Width/2,BubbleSpace+5)});
    }
+   int memoSpace=StickyMemos.Space(Store.State,MemoBudget(preview));StickyMemos.Draw(graphics,Width,BubbleSpace,Store.State,MemoBudget(preview));
+   int petTop=BubbleSpace+memoSpace+(preview?FocusTimerHeight:FocusTimerSpace);
+   if(preview||Store.State.FocusEnd!=DateTime.MinValue)FocusTimerArt.Draw(graphics,new Rectangle((Width-(int)Math.Round(140*Store.State.FocusTimerScale/100.0))/2,BubbleSpace+memoSpace,(int)Math.Round(140*Store.State.FocusTimerScale/100.0),FocusTimerHeight-8),Store.State,AppClock.Now,preview);
    var transform=graphics.Save();int size=Store.State.PetSize;int little=Companions.Current(Store.State)==null?0:Companions.SizeFor(size);int mainX=(Width-size-little)/2;
-   if(actionFrames>0){graphics.TranslateTransform(mainX+size/2f,BubbleSpace+size/2f);if(actionName=="공중제비"){double angle=(60-actionFrames)*Math.PI*2/60;graphics.RotateTransform((float)(angle*180/Math.PI));float fit=(float)(1/(Math.Abs(Math.Cos(angle))+Math.Abs(Math.Sin(angle))));graphics.ScaleTransform(fit,fit);}else{graphics.RotateTransform((float)Math.Sin(actionFrames*.35)*12);graphics.TranslateTransform(0,-Math.Abs((float)Math.Sin(actionFrames*.25))*8);}graphics.TranslateTransform(-mainX-size/2f,-BubbleSpace-size/2f);}
-   if(cartwheelFrame>=0){graphics.TranslateTransform(mainX+size/2f,BubbleSpace+size/2f);graphics.RotateTransform(direction*cartwheelFrame*360f/24);double angle=cartwheelFrame*Math.PI*2/24;float fit=(float)(1/(Math.Abs(Math.Cos(angle))+Math.Abs(Math.Sin(angle))));graphics.ScaleTransform(fit,fit);graphics.TranslateTransform(-mainX-size/2f,-BubbleSpace-size/2f);}
-   PetArt.Draw(graphics,new Rectangle(mainX,BubbleSpace+(frame/3%2),size,size),frame/3,direction<0,Progression.Accessory(Store.State));graphics.Restore(transform);Companions.Draw(graphics,new Rectangle(mainX+size+4,BubbleSpace+size-little-(actionFrames>0&&actionName=="함께 놀기"?(int)(Math.Abs(Math.Sin(actionFrames*.25))*8):0),little,little),Store.State,frame);Progression.Sparkles(graphics,new Rectangle(0,BubbleSpace,Width,size),frame,AppClock.Now<celebrationUntil);
-   DateTime fed=AppClock.Decode(Store.State.LastFedLocal,DateTime.MinValue);if(fed!=DateTime.MinValue&&AppClock.Now>=fed&&AppClock.Now<fed.AddSeconds(5))LivingArt.Food(graphics,Store.State.LastFood,new Rectangle(Width/2+size/4,BubbleSpace+size/2,Math.Max(24,size/3),Math.Max(24,size/3)));
+   if(actionFrames>0){graphics.TranslateTransform(mainX+size/2f,petTop+size/2f);if(actionName=="공중제비"){double angle=(60-actionFrames)*Math.PI*2/60;graphics.RotateTransform((float)(angle*180/Math.PI));float fit=(float)(1/(Math.Abs(Math.Cos(angle))+Math.Abs(Math.Sin(angle))));graphics.ScaleTransform(fit,fit);}else{graphics.RotateTransform((float)Math.Sin(actionFrames*.35)*12);graphics.TranslateTransform(0,-Math.Abs((float)Math.Sin(actionFrames*.25))*8);}graphics.TranslateTransform(-mainX-size/2f,-petTop-size/2f);}
+   if(cartwheelFrame>=0){graphics.TranslateTransform(mainX+size/2f,petTop+size/2f);graphics.RotateTransform(direction*cartwheelFrame*360f/24);double angle=cartwheelFrame*Math.PI*2/24;float fit=(float)(1/(Math.Abs(Math.Cos(angle))+Math.Abs(Math.Sin(angle))));graphics.ScaleTransform(fit,fit);graphics.TranslateTransform(-mainX-size/2f,-petTop-size/2f);}
+   PetArt.Draw(graphics,new Rectangle(mainX,petTop+(frame/3%2),size,size),frame/3,direction<0,Progression.Accessory(Store.State));graphics.Restore(transform);Companions.Draw(graphics,new Rectangle(mainX+size+4,petTop+size-little-(actionFrames>0&&actionName=="함께 놀기"?(int)(Math.Abs(Math.Sin(actionFrames*.25))*8):0),little,little),Store.State,frame);Progression.Sparkles(graphics,new Rectangle(0,petTop,Width,size),frame,AppClock.Now<celebrationUntil);
+   DateTime fed=AppClock.Decode(Store.State.LastFedLocal,DateTime.MinValue);if(fed!=DateTime.MinValue&&AppClock.Now>=fed&&AppClock.Now<fed.AddSeconds(5))LivingArt.Food(graphics,Store.State.LastFood,new Rectangle(Width/2+size/4,petTop+size/2,Math.Max(24,size/3),Math.Max(24,size/3)));
   }
   protected override void Dispose(bool disposing){if(disposing){animation.Dispose();clock.Dispose();if(tray!=null){tray.Visible=false;tray.Dispose();tray=null;}}base.Dispose(disposing);}
   public void Quit(){shuttingDown=true;if(game!=null&&!game.IsDisposed)game.Close();Store.Save();animation.Stop();clock.Stop();tray.Visible=false;tray.Dispose();Application.Exit();}
@@ -265,6 +276,11 @@ namespace DeskBuddy {
    if(args.Contains("--volley-test"))return VolleyballTests.Execute();
    if(args.Contains("--level-test"))return ProgressionUiTests.Execute();
 
+   if(args.Contains("--memo-test"))return StickyMemoForm.TestUi();
+   if(args.Contains("--schedule-range-test"))return ScheduleRangeTests.Execute();
+   if(args.Contains("--focus-timer-test"))return FocusTimerArt.Preview();
+   if(args.Contains("--month-calendar-test"))return ScheduleCalendarForm.TestUi();
+   if(args.Contains("--calendar-test"))return GoogleCalendar.TestUi();
    if(args.Contains("--alert-test"))return GameAlert.Test();
    if(args.Contains("--dodge-test"))return DodgeForm.TestUi();
    if(args.Contains("--castle-test"))return CastleTests.Execute();
@@ -396,7 +412,7 @@ namespace DeskBuddy {
 
   static int SelfTest(){
    try{
-    CastleTests.Run();DodgeEngine.Tests();Progression.Tests();
+    StickyMemos.Tests();FocusTimerArt.Tests();CalendarDates.Tests();GoogleCalendar.Tests();CastleTests.Run();DodgeEngine.Tests();Progression.Tests();
     LivingTests.Run();Companions.Tests();AdminAccess.Tests();using(var image=new Bitmap(500,200))using(var g=Graphics.FromImage(image)){foreach(int scale in new[]{60,100,160}){var bounds=new Rectangle(0,0,(int)(246*scale/100.0),(int)(54*scale/100.0));using(var font=Theme.BubbleFont(g,"일정 알림",bounds,scale))if(Math.Abs(font.Size-16*scale/100f)>0.01f)throw new Exception("Bubble font proportional scale");using(var font=Theme.BubbleFont(g,"긴 일정 알림입니다. 회의 준비와 자료 확인을 마치고 참석해주세요.",bounds,scale))if(g.MeasureString("긴 일정 알림입니다. 회의 준비와 자료 확인을 마치고 참석해주세요.",font,bounds.Width).Height>bounds.Height)throw new Exception("Bubble text fit");}}
     VolleyballTests.Run();ScheduleTests.Run();
     var d=new Data();var t=new TaskItem();
