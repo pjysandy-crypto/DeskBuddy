@@ -30,7 +30,7 @@ namespace DeskBuddy {
  public class Data {
   public int Fullness=70,Happiness=70,MealsGiven;public string CareLocal=AppClock.Encode(AppClock.Now),LastFood="",LastFedLocal="",RoomWallpaper="기본 벽지",RoomRug="기본 러그",RoomDecoration="기본 장식";
   public List<string> RoomOwned=new List<string>{"기본 벽지","기본 러그","기본 장식"};
-  public int Coins=30, Completed, FocusCount, FocusMinutes,ExperienceAdjustment;
+  public int Coins=30, Completed, FocusCount, FocusMinutes,ExperienceAdjustment; public int InteractionExperience;public string LastInteractionLocal="";
   public string PetName="스누피", ImagePath="", Equipped="기본"; public int PixelSize=3; public int PetSize=140; public int BubbleScale=100; public int FocusTimerScale=100; public Dictionary<string,LittlePet> Companions=new Dictionary<string,LittlePet>();
   public List<MemoNote> Memos=new List<MemoNote>(); public List<string> Owned=new List<string>{"기본"}; public List<TaskItem> Tasks=new List<TaskItem>();
   public bool Wander=true, Quiet=false; public bool Cartwheels=true; public List<string> CharacterSamples=new List<string>(); public DateTime FocusEnd=DateTime.MinValue; public string FocusEndLocal=""; public int SessionMinutes; public string GamesDate=""; public int GamesPlayed;
@@ -172,7 +172,7 @@ namespace DeskBuddy {
   }
 
   int actionFrames,observedLevel=Companions.Level(Store.State);string actionName="";DateTime celebrationUntil;
-  public void SpecialAction(string name){int required=name=="함께 놀기"?5:3;if(Companions.Level(Store.State)<required){GameAlert.Show("레벨 "+required+"부터 사용할 수 있어요.");return;}if(game!=null||Store.State.FocusEnd!=DateTime.MinValue)return;if(required==5){var p=Companions.Current(Store.State);if(p==null){GameAlert.Show("먼저 알을 입양해주세요.");return;}if(AppClock.Now<AppClock.Decode(p.LastPlay,DateTime.MinValue).AddMinutes(1)){GameAlert.Show("함께 놀기는 1분마다 가능해요.");return;}p.Bond++;p.LastPlay=AppClock.Encode(AppClock.Now);Store.Save();}actionName=name;actionFrames=60;cartwheelFrame=-1;Say(name+"~ 같이 신나게 놀자!",false);}
+  public void SpecialAction(string name){int required=name=="함께 놀기"?5:3;if(Companions.Level(Store.State)<required){GameAlert.Show("레벨 "+required+"부터 사용할 수 있어요.");return;}if(game!=null||Store.State.FocusEnd!=DateTime.MinValue)return;if(required==5){var p=Companions.Current(Store.State);if(p==null){GameAlert.Show("먼저 알을 입양해주세요.");return;}if(AppClock.Now<AppClock.Decode(p.LastPlay,DateTime.MinValue).AddMinutes(1)){GameAlert.Show("함께 놀기는 1분마다 가능해요.");return;}p.Bond++;p.LastPlay=AppClock.Encode(AppClock.Now);Store.Save();}actionName=name;actionFrames=60;cartwheelFrame=-1;Say(name+"~ 같이 신나게 놀자!"+RewardInteraction(),false);}
   void CheckLevelUp(){int level=Companions.Level(Store.State);if(level==observedLevel)return;if(Application.OpenForms.Cast<Form>().Any(f=>f is AdminForm&&f.Visible))return;int previous=observedLevel;observedLevel=level;ApplyPetSize();if(level>previous){celebrationUntil=AppClock.Now.AddSeconds(12);string unlocked=Progression.Unlocks(previous,level);Say("LEVEL UP! 레벨 "+level+"!",false);var alert=new GameAlertForm("레벨 "+level+" 달성! 축하해요!"+(unlocked.Length==0?"":"\n"+unlocked),"LEVEL UP! 새 모험",MessageBoxButtons.OK,MessageBoxIcon.None);alert.Show(dashboard!=null&&!dashboard.IsDisposed? (IWin32Window)dashboard:this);if(dashboard!=null&&!dashboard.IsDisposed)dashboard.RefreshPage();}}
   void Animate(){
    if(actionFrames>0)actionFrames--;frame++;bool available=!dragging&&game==null&&Store.State.FocusEnd==DateTime.MinValue;
@@ -185,7 +185,9 @@ namespace DeskBuddy {
    if(cartwheelFrame>=0&&++cartwheelFrame>=24)cartwheelFrame=-1;
    RenderLayered();
   }
-  public void Cartwheel(){if(game!=null||Store.State.FocusEnd!=DateTime.MinValue)return;cartwheelFrame=0;Say("옆돌기~ 같이 한 바퀴!",false);}
+  string RewardInteraction(){int before=Store.State.InteractionExperience;string previous=Store.State.LastInteractionLocal;if(!Companions.RewardInteraction(Store.State,AppClock.Now))return " (경험치는 30초마다!)";if(!Store.Save()){Store.State.InteractionExperience=before;Store.State.LastInteractionLocal=previous;return " (경험치를 저장하지 못했어)";}if(dashboard!=null&&!dashboard.IsDisposed)dashboard.RefreshPage();CheckLevelUp();return " +5 EXP";}
+  public void Pat(){Say("쓰다듬어줘서 고마워!"+RewardInteraction(),false);}
+  public void Cartwheel(){if(game!=null||Store.State.FocusEnd!=DateTime.MinValue)return;cartwheelFrame=0;Say("옆돌기~ 같이 한 바퀴!"+RewardInteraction(),false);}
   public void Feed(string name){string snapshot=new JavaScriptSerializer().Serialize(Store.State);string error;if(!Living.Feed(Store.State,name,AppClock.Now,out error)){GameAlert.Show(error,"밥 / 간식");return;}if(!Store.Save()){Store.State=new JavaScriptSerializer().Deserialize<Data>(snapshot);return;}Say("냠냠! "+name+" 고마워~",false);if(dashboard!=null&&!dashboard.IsDisposed)dashboard.RefreshPage();}
   public void CharacterChanged(){ApplyPetSize();noticePose="";noticePoseUntil=DateTime.MinValue;var active=Scheduler.Appearance(Store.State,AppClock.Now);ignoredAppearanceId=active==null?"":active.Id;PetArt.SetScheduleImage("");RefreshIdentity();}
   public void RefreshIdentity(){Text="DeskBuddy · "+Store.State.PetName;tray.Text=("DeskBuddy · "+Store.State.PetName);RenderLayered();}

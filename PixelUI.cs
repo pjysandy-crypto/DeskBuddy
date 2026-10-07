@@ -217,8 +217,8 @@ namespace DeskBuddy {
    if(page=="나의 방")Home();else if(page=="오늘의 업무")Tasks();else if(page=="집중 스튜디오")FocusPage();else if(page=="미니게임")Game();else if(page=="코인 상점")Shop();else if(page=="나의 캐릭터")Character();else if(page=="펫 키우기"){Title("LITTLE PET / FROM AN EGG","우리 친구의 작은 펫","레벨 2부터 알을 입양해 함께 돌봐주세요.");CompanionPanel();}else Settings();
   }
   void Home(){
-   Title("HOME / SAVE FILE 01",Store.State.PetName+"의 작은 방","오늘의 일도, 잠깐의 휴식도. 여기서 함께 시작해요.");
-   var scene=new RoomScene{Location=new Point(0,112),Size=new Size(720,223)};scene.Click+=(s,e)=>pet.Say("쓰다듬어줘서 고마워! 오늘도 함께하자.",false);Add(scene);
+   Title("HOME / SAVE FILE 01",Store.State.PetName+"의 작은 방","쓰다듬기·놀기 +5 EXP · 교감 경험치는 30초에 한 번!");
+   var scene=new RoomScene{Location=new Point(0,112),Size=new Size(720,223)};scene.Click+=(s,e)=>pet.Pat();Add(scene);
    var care=Card(0,351,720,79);care.Controls.Add(Theme.Label("포만감 "+Store.State.Fullness+" / 100   기분 "+Store.State.Happiness+" / 100",16,12,350,26,10));
    care.Controls.Add(Theme.Label(Store.State.Fullness<30?"꼬르륵~ 밥 먹고 싶어!":"맛있는 것 먹고 같이 쉬자~",16,44,350,24,10,Theme.Muted));
    care.Controls.Add(Theme.Button("밥 주기 12 G",371,20,158,40,(s,e)=>{pet.Feed("든든한 밥");RefreshPage();},true));
@@ -230,7 +230,7 @@ namespace DeskBuddy {
    bar.Controls.Add(new Panel{Location=new Point(3,3),Size=new Size(Math.Max(1,(int)(357*(xp%100)/100.0)),16),BackColor=Theme.Purple});
    hud.Controls.Add(Theme.Label("남은 퀘스트  "+Store.State.Tasks.Count(t=>!t.Done),552,20,160,26));
    B("퀘스트 보드",0,522,174,42,(s,e)=>Navigate("오늘의 업무"),true);
-   B("쓰다듬기",186,522,104,42,(s,e)=>pet.Say("헤헤. 네가 있어서 좋아!",false));
+   B("쓰다듬기",186,522,104,42,(s,e)=>pet.Pat());
    B("옆돌기",302,522,104,42,(s,e)=>pet.Cartwheel());
    B("방 꾸미기",418,522,146,42,(s,e)=>{shopTab="방";Navigate("코인 상점");});
    B("상점 구경",576,522,144,42,(s,e)=>Navigate("코인 상점"));
