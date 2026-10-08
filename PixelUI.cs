@@ -242,8 +242,10 @@ namespace DeskBuddy {
    B("작은 펫 키우기",0,580,720,42,(s,e)=>Navigate("펫 키우기"));
    var dance=B("댄스 · Lv.3",0,640,232,42,(s,e)=>pet.SpecialAction("댄스"));dance.Enabled=Companions.Level(Store.State)>=3;var flip=B("공중제비 · Lv.3",244,640,232,42,(s,e)=>pet.SpecialAction("공중제비"));flip.Enabled=dance.Enabled;var together=B("함께 놀기 · Lv.5",488,640,232,42,(s,e)=>pet.SpecialAction("함께 놀기"));together.Enabled=Companions.Level(Store.State)>=5&&Companions.Current(Store.State)!=null;
    L("레벨 2 펫 · 3 액션 · 4 특별 상점 · 5 함께 놀기 · 7 별빛 · 10 왕실",0,701,720,28,9,Theme.Muted);
+   DittoButtons(742);
   }
   
+  void DittoButtons(int y){if(!DittoTransformation.IsDitto(Store.State))return;bool unlocked=DittoTransformation.Unlocked(Store.State);var transform=B(unlocked?"변신":"변신 · Lv.5",0,y,350,42,(s,e)=>pet.TransformDitto(false),true);transform.Enabled=unlocked;var restore=B("메타몽으로 돌아오기",370,y,350,42,(s,e)=>pet.TransformDitto(true));restore.Enabled=!String.IsNullOrEmpty(Store.State.DittoForm);L("두 모습 중 랜덤 변신 · 메타몽의 펫과 성장 기록은 그대로 유지돼요.",0,y+48,720,28,9,Theme.Muted);}
   void CompanionPanel(){var little=Companions.Current(Store.State);var card=Card(0,112,720,151);card.Controls.Add(new CompanionPortrait{Location=new Point(16,18),Size=new Size(100,100)});card.Controls.Add(Theme.Label("작은 펫 · "+(Companions.Level(Store.State)<2?"레벨 2부터 이용 가능":Companions.Stage(little)),130,16,560,28,12));card.Controls.Add(Theme.Label(little==null?"레벨 2부터 이용 가능해요. 기존 성장 기록은 보관돼요.":little.Growth>=10?"성장 완료! 친밀도 "+little.Bond+" · 계속 함께 놀아요.":"돌봄 "+little.Growth+" / 10 · 3회 부화, 10회 성장 완료",130,50,560,25,10,Theme.Muted));
    if(little==null){var adopt=Theme.Button("알 입양하기",130,90,250,40,(s,e)=>CompanionAction(0),true);adopt.Enabled=Companions.Level(Store.State)>=2;card.Controls.Add(adopt);}else{card.Controls.Add(Theme.Button(little.Growth<3?"알 보살피기 5 G":"펫 놀아주기 5 G",130,90,250,40,(s,e)=>CompanionAction(1),true));card.Controls.Add(Theme.Button(little.Growth<3?"영양 주기 8 G":"펫 밥 주기 8 G",396,90,250,40,(s,e)=>CompanionAction(2)));}
    L("각 캐릭터의 펫은 따로 자라요. 돌봄은 1분마다 가능해요.",0,280,720,28,10,Theme.Muted);var guide=Card(0,329,720,147);guide.Controls.Add(Theme.Label("알 → 아기 펫 → 다 자란 펫",20,16,680,30,13));guide.Controls.Add(Theme.Label("돌봄 / 놀아주기 5 G · 영양 / 밥 주기 8 G",20,55,680,26,10));guide.Controls.Add(Theme.Label("찌오의 펫은 반짝이는 둥근 아기 새로 자라요.",20,91,680,26,10,Theme.Muted)); }
@@ -291,11 +293,11 @@ namespace DeskBuddy {
   }
 
   void Game(){
-   Title("MINIGAMES / PLAY WITH YOUR BUDDY","친구와 미니게임","레벨 1 똥 피하기 · 레벨 2 농구 · 레벨 3 마법의 성 · 레벨 5 배구");
+   Title("MINIGAMES / PLAY WITH YOUR BUDDY","친구와 미니게임","레벨 1 똥 피하기 · 레벨 3 마법의 성 · 레벨 5 배구 · 레벨 7 농구");
    GameCard("똥 피하기","하늘에서 똥 피하기","화살표 이동 · 20 / 25 / 30초 생존 · 3탄 클리어 +50 G","똥 피하기 시작",111,()=>pet.StartDodge());
-   GameCard("농구","움직이는 골대 농구 · 3탄","← → 조준 · SPACE 누르고 떼서 슛 · 골대 / 수비 / 바람 · +50 G","농구 시작",233,()=>pet.StartBasketball());
-   GameCard("마법의 성","마법의 성 · 1~3탄 모험","이동 / 점프 / 마법 · 별 3개와 꼭대기 문 · 3탄 클리어 +50 G","마법의 성 모험 시작",355,()=>pet.StartCastle());
-   GameCard("배구","바탕화면 배구","← → 이동 · SPACE 점프 · ↓ 스매시 · 승리 +20 G / 패배 +5 G","바탕화면 배구 시작",477,()=>pet.StartVolleyball());
+   GameCard("마법의 성","마법의 성 · 1~3탄 모험","이동 / 점프 / 마법 · 별 3개와 꼭대기 문 · 3탄 클리어 +50 G","마법의 성 모험 시작",233,()=>pet.StartCastle());
+   GameCard("배구","바탕화면 배구","← → 이동 · SPACE 점프 · ↓ 스매시 · 승리 +20 G / 패배 +5 G","바탕화면 배구 시작",355,()=>pet.StartVolleyball());
+   GameCard("농구","움직이는 골대 농구 · 1~3탄","← → 조준 · SPACE 누르고 떼서 슛 · 골대 / 수비 / 바람 · +50 G","농구 시작",477,()=>pet.StartBasketball());
    int played=Store.State.GamesDate==AppClock.Now.ToString("yyyy-MM-dd")?Store.State.GamesPlayed:0;
    L("네 게임 보상 합산 하루 3회 · 오늘 "+played+" / 3 · 집중 중에는 게임을 시작할 수 없어요.",0,605,744,28,10,Theme.Muted);
    L("ESC/P 일시정지 · 다른 창 전환 시 자동 정지 · R 처음부터 다시 도전",0,641,744,28,10,Theme.Muted);
@@ -328,6 +330,7 @@ namespace DeskBuddy {
   }
   void Character(){
    Title("CHARACTER / CUSTOMIZE","나만의 친구","좋아하는 캐릭터 이미지로 교체하고 이름을 지어줘요.");
+   DittoButtons(901);
    var form=Card(0,289,720,70);
    form.Controls.Add(Theme.Label("이름",16, 20,80, 28));
    var name=Theme.Input(Store.State.PetName,98,20,406);name.MaxLength=24;form.Controls.Add(name);
@@ -354,9 +357,10 @@ namespace DeskBuddy {
     card.Controls.Add(Theme.Button(selected?"선택됨":CharacterLibrary.Label(path),6,121,100,33,(s,e)=>SelectCharacter(path)));index++;
    }
    if(index==0)L("샘플 여러 개 추가로 이미지들을 등록해 주세요.",0,650,744,30,10,Theme.Muted);
+   DittoButtons(749+Math.Max(0,(index-6+5)/6)*166);
 
   }
-  void SelectCharacter(string path){if(!PetArt.LoadCustom(path)){GameAlert.Show("캐릭터 이미지를 읽지 못했습니다.");return;}Store.State.ImagePath=path;if(string.IsNullOrEmpty(path)||path.StartsWith("builtin:",StringComparison.Ordinal))Store.State.PetName=CharacterLibrary.Label(string.IsNullOrEmpty(path)?CharacterLibrary.Default:path);Store.Save();pet.CharacterChanged();RefreshPage();}
+  void SelectCharacter(string path){if(!PetArt.LoadCustom(path)){GameAlert.Show("캐릭터 이미지를 읽지 못했습니다.");return;}Store.State.ImagePath=path;DittoTransformation.Restore(Store.State);if(string.IsNullOrEmpty(path)||path.StartsWith("builtin:",StringComparison.Ordinal))Store.State.PetName=CharacterLibrary.Label(string.IsNullOrEmpty(path)?CharacterLibrary.Default:path);Store.Save();pet.CharacterChanged();RefreshPage();}
   void AddSamples(){
    using(var dialog=new OpenFileDialog{Filter="캐릭터 이미지|*.png;*.jpg;*.jpeg;*.bmp",Multiselect=true,Title="샘플 캐릭터들을 선택하세요"}){
     if(dialog.ShowDialog()!=DialogResult.OK)return;
@@ -371,7 +375,7 @@ namespace DeskBuddy {
      using(var im=Image.FromFile(dialog.FileName)){if(im.Width>4096||im.Height>4096)throw new Exception("4096px 이하 이미지를 사용해주세요.");
       Directory.CreateDirectory(Store.Root);string target=Path.Combine(Store.Root,"character-"+Guid.NewGuid().ToString("N")+".png");
       using(var b=new Bitmap(im))b.Save(target,System.Drawing.Imaging.ImageFormat.Png);if(!PetArt.LoadCustom(target))throw new Exception("이미지를 불러오지 못했습니다.");
-      Store.State.ImagePath=target;Store.Save();pet.CharacterChanged();RefreshPage();
+      Store.State.ImagePath=target;DittoTransformation.Restore(Store.State);Store.Save();pet.CharacterChanged();RefreshPage();
      }
     }catch(Exception e){GameAlert.Show(e.Message,"캐릭터 선택");}
    }

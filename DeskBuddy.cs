@@ -31,7 +31,7 @@ namespace DeskBuddy {
   public int Fullness=70,Happiness=70,MealsGiven;public string CareLocal=AppClock.Encode(AppClock.Now),LastFood="",LastFedLocal="",RoomWallpaper="기본 벽지",RoomRug="기본 러그",RoomDecoration="기본 장식";
   public List<string> RoomOwned=new List<string>{"기본 벽지","기본 러그","기본 장식"};
   public int Coins=30, Completed, FocusCount, FocusMinutes,ExperienceAdjustment; public int InteractionExperience;public string LastInteractionLocal="";
-  public string PetName="스누피", ImagePath="", Equipped="기본"; public int PixelSize=3; public int PetSize=140; public int BubbleScale=100; public int FocusTimerScale=100; public Dictionary<string,LittlePet> Companions=new Dictionary<string,LittlePet>();
+  public string DittoForm="";public string PetName="스누피", ImagePath="", Equipped="기본"; public int PixelSize=3; public int PetSize=140; public int BubbleScale=100; public int FocusTimerScale=100; public Dictionary<string,LittlePet> Companions=new Dictionary<string,LittlePet>();
   public List<MemoNote> Memos=new List<MemoNote>(); public List<string> Owned=new List<string>{"기본"}; public List<TaskItem> Tasks=new List<TaskItem>();
   public List<ProjectItem> Projects=new List<ProjectItem>(); public List<WorkDiaryItem> Diaries=new List<WorkDiaryItem>();
   public List<KpiItem> Kpis=new List<KpiItem>(); public List<MonthlyReport> MonthlyReports=new List<MonthlyReport>(); public string AiProvider="Claude"; public Dictionary<string,string> AiModels=new Dictionary<string,string>();
@@ -85,7 +85,7 @@ namespace DeskBuddy {
 
   static Rectangle customBounds;static Size customSize;
   static Rectangle Bounds(Bitmap image){int left=image.Width,top=image.Height,right=-1,bottom=-1;using(var copy=new Bitmap(image.Width,image.Height,PixelFormat.Format32bppArgb)){using(var g=Graphics.FromImage(copy))g.DrawImageUnscaled(image,0,0);var bits=copy.LockBits(new Rectangle(Point.Empty,copy.Size),ImageLockMode.ReadOnly,PixelFormat.Format32bppArgb);try{byte[] pixels=new byte[bits.Stride*bits.Height];System.Runtime.InteropServices.Marshal.Copy(bits.Scan0,pixels,0,pixels.Length);for(int y=0;y<copy.Height;y++)for(int x=0;x<copy.Width;x++)if(pixels[y*bits.Stride+x*4+3]>24){left=Math.Min(left,x);top=Math.Min(top,y);right=Math.Max(right,x);bottom=Math.Max(bottom,y);}}finally{copy.UnlockBits(bits);}}return right<left?new Rectangle(Point.Empty,image.Size):Rectangle.FromLTRB(left,top,right+1,bottom+1);}
-  public static Bitmap Custom,ScheduleCustom; static string schedulePath=""; public static bool HasCustom{get{return CompanionPlayActive||ScheduleCustom!=null||Custom!=null;}} public static bool SetScheduleImage(string path){path=path??"";if(path==schedulePath)return false;schedulePath=path;if(ScheduleCustom!=null){ScheduleCustom.Dispose();ScheduleCustom=null;}try{if(path.Length>0)using(var im=Image.FromFile(path))ScheduleCustom=new Bitmap(im);}catch(Exception ex){Startup.Log("Schedule image: "+ex.Message);}return true;}
+  public static Bitmap Custom,ScheduleCustom; static string schedulePath=""; public static bool HasCustom{get{return CompanionPlayActive||DittoTransformation.CurrentImage(Store.State)!=null||ScheduleCustom!=null||Custom!=null;}} public static bool SetScheduleImage(string path){path=path??"";if(path==schedulePath)return false;schedulePath=path;if(ScheduleCustom!=null){ScheduleCustom.Dispose();ScheduleCustom=null;}try{if(path.Length>0)using(var im=Image.FromFile(path))ScheduleCustom=new Bitmap(im);}catch(Exception ex){Startup.Log("Schedule image: "+ex.Message);}return true;}
   public static void CompanionPlayTests(){
    Data previous=Store.State;Bitmap oldCustom=Custom,oldSchedule=ScheduleCustom;
    using(var baseImage=new Bitmap(8,8))using(var scheduleImage=new Bitmap(8,8)){
@@ -111,7 +111,7 @@ namespace DeskBuddy {
   }
 
   public static void DrawCustom(Graphics output,Rectangle box,bool facingLeft,string accessory){
-   bool playing=CompanionPlayActive;var picture=playing?companionPlayImage:ScheduleCustom??Custom;if(picture==null)return;
+   bool playing=CompanionPlayActive;var picture=playing?companionPlayImage:DittoTransformation.CurrentImage(Store.State)??ScheduleCustom??Custom;if(picture==null)return;
    var state=output.Save();
    try{
     output.CompositingMode=CompositingMode.SourceOver;
@@ -205,6 +205,11 @@ namespace DeskBuddy {
   }
 
   bool companionPlayWasActive;int actionFrames,observedLevel=Companions.Level(Store.State);string actionName="";DateTime celebrationUntil;
+  public void TransformDitto(bool restore){
+   if(!DittoTransformation.IsDitto(Store.State))return;string previous=Store.State.DittoForm,error;
+   if(restore)DittoTransformation.Restore(Store.State);else if(!DittoTransformation.Change(Store.State,random,out error)){GameAlert.Show(error,"메타몽 변신");return;}
+   if(!Store.Save()){Store.State.DittoForm=previous;return;}cartwheelFrame=-1;actionFrames=0;RenderLayered();if(dashboard!=null&&!dashboard.IsDisposed)dashboard.RefreshPage();
+  }
   public void PlayWithCompanion(){if(!PetArt.BeginCompanionPlay(random))return;companionPlayWasActive=true;cartwheelFrame=-1;actionFrames=0;RenderLayered();if(dashboard!=null&&!dashboard.IsDisposed)dashboard.Invalidate(true);}
   public void SpecialAction(string name){int required=name=="함께 놀기"?5:3;if(Companions.Level(Store.State)<required){GameAlert.Show("레벨 "+required+"부터 사용할 수 있어요.");return;}if(game!=null||Store.State.FocusEnd!=DateTime.MinValue)return;if(required==5){var p=Companions.Current(Store.State);if(p==null){GameAlert.Show("먼저 알을 입양해주세요.");return;}if(AppClock.Now<AppClock.Decode(p.LastPlay,DateTime.MinValue).AddMinutes(1)){GameAlert.Show("함께 놀기는 1분마다 가능해요.");return;}p.Bond++;p.LastPlay=AppClock.Encode(AppClock.Now);Store.Save();}actionName=name;actionFrames=60;cartwheelFrame=-1;Say(name+"~ 같이 신나게 놀자!"+RewardInteraction(),false);if(name=="함께 놀기"){var p=Companions.Current(Store.State);if(p!=null&&p.Growth<10&&(Companions.Key(Store.State).EndsWith("jiyoung_ch",StringComparison.Ordinal)||Companions.Key(Store.State).EndsWith("jimin_ch",StringComparison.Ordinal)))actionFrames=0;PlayWithCompanion();}}
   void CheckLevelUp(){int level=Companions.Level(Store.State);if(level==observedLevel)return;if(Application.OpenForms.Cast<Form>().Any(f=>f is AdminForm&&f.Visible))return;int previous=observedLevel;observedLevel=level;ApplyPetSize();if(level>previous){celebrationUntil=AppClock.Now.AddSeconds(12);string unlocked=Progression.Unlocks(previous,level);Say("LEVEL UP! 레벨 "+level+"!",false);var alert=new GameAlertForm("레벨 "+level+" 달성! 축하해요!"+(unlocked.Length==0?"":"\n"+unlocked),"LEVEL UP! 새 모험",MessageBoxButtons.OK,MessageBoxIcon.None);alert.Show(dashboard!=null&&!dashboard.IsDisposed? (IWin32Window)dashboard:this);if(dashboard!=null&&!dashboard.IsDisposed)dashboard.RefreshPage();}}
@@ -224,7 +229,7 @@ namespace DeskBuddy {
   public void Pat(){Say("쓰다듬어줘서 고마워!"+RewardInteraction(),false);}
   public void Cartwheel(){if(game!=null||Store.State.FocusEnd!=DateTime.MinValue)return;cartwheelFrame=0;Say("옆돌기~ 같이 한 바퀴!"+RewardInteraction(),false);}
   public void Feed(string name){string snapshot=new JavaScriptSerializer().Serialize(Store.State);string error;if(!Living.Feed(Store.State,name,AppClock.Now,out error)){GameAlert.Show(error,"밥 / 간식");return;}if(!Store.Save()){Store.State=new JavaScriptSerializer().Deserialize<Data>(snapshot);return;}Say("냠냠! "+name+" 고마워~",false);if(dashboard!=null&&!dashboard.IsDisposed)dashboard.RefreshPage();}
-  public void CharacterChanged(){PetArt.ClearCompanionPlay();ApplyPetSize();noticePose="";noticePoseUntil=DateTime.MinValue;var active=Scheduler.Appearance(Store.State,AppClock.Now);ignoredAppearanceId=active==null?"":active.Id;PetArt.SetScheduleImage("");RefreshIdentity();}
+  public void CharacterChanged(){DittoTransformation.Restore(Store.State);PetArt.ClearCompanionPlay();ApplyPetSize();noticePose="";noticePoseUntil=DateTime.MinValue;var active=Scheduler.Appearance(Store.State,AppClock.Now);ignoredAppearanceId=active==null?"":active.Id;PetArt.SetScheduleImage("");RefreshIdentity();}
   public void RefreshIdentity(){Text="DeskBuddy · "+Store.State.PetName;tray.Text=("DeskBuddy · "+Store.State.PetName);RenderLayered();}
   public void StartDodge(){StartGame(()=>new DodgeForm(this));}
   bool GameUnlocked(string name){int required=Progression.GameLevel(name);if(Companions.Level(Store.State)>=required)return true;GameAlert.Show("레벨 "+required+"부터 "+name+" 게임을 할 수 있어요.");return false;}
@@ -456,7 +461,7 @@ namespace DeskBuddy {
    string realPath=Store.FilePath;string sandbox=Path.Combine(Path.GetTempPath(),"DeskBuddy-selftest-"+Guid.NewGuid().ToString("N"));
    Directory.CreateDirectory(sandbox);Store.FilePath=Path.Combine(sandbox,"data.json");
    try{
-    StickyMemos.Tests();FocusTimerArt.Tests();CalendarDates.Tests();GoogleCalendar.Tests();CastleTests.Run();DodgeEngine.Tests();BasketballEngine.Tests();Progression.Tests();
+    StickyMemos.Tests();FocusTimerArt.Tests();CalendarDates.Tests();GoogleCalendar.Tests();CastleTests.Run();DodgeEngine.Tests();BasketballEngine.Tests();Progression.Tests();DittoTransformation.Tests();
     LivingTests.Run();Companions.Tests();PetArt.CompanionPlayTests();AdminAccess.Tests();using(var image=new Bitmap(500,200))using(var g=Graphics.FromImage(image)){foreach(int scale in new[]{60,100,160}){var bounds=new Rectangle(0,0,(int)(246*scale/100.0),(int)(54*scale/100.0));using(var font=Theme.BubbleFont(g,"일정 알림",bounds,scale))if(Math.Abs(font.Size-16*scale/100f)>0.01f)throw new Exception("Bubble font proportional scale");using(var font=Theme.BubbleFont(g,"긴 일정 알림입니다. 회의 준비와 자료 확인을 마치고 참석해주세요.",bounds,scale))if(g.MeasureString("긴 일정 알림입니다. 회의 준비와 자료 확인을 마치고 참석해주세요.",font,bounds.Width).Height>bounds.Height)throw new Exception("Bubble text fit");}}
     VolleyballTests.Run();ScheduleTests.Run();DiaryTests.Run();
     var d=new Data();var t=new TaskItem();
