@@ -247,7 +247,7 @@ namespace DeskBuddy {
   void CompanionPanel(){var little=Companions.Current(Store.State);var card=Card(0,112,720,151);card.Controls.Add(new CompanionPortrait{Location=new Point(16,18),Size=new Size(100,100)});card.Controls.Add(Theme.Label("작은 펫 · "+(Companions.Level(Store.State)<2?"레벨 2부터 이용 가능":Companions.Stage(little)),130,16,560,28,12));card.Controls.Add(Theme.Label(little==null?"레벨 2부터 이용 가능해요. 기존 성장 기록은 보관돼요.":little.Growth>=10?"성장 완료! 친밀도 "+little.Bond+" · 계속 함께 놀아요.":"돌봄 "+little.Growth+" / 10 · 3회 부화, 10회 성장 완료",130,50,560,25,10,Theme.Muted));
    if(little==null){var adopt=Theme.Button("알 입양하기",130,90,250,40,(s,e)=>CompanionAction(0),true);adopt.Enabled=Companions.Level(Store.State)>=2;card.Controls.Add(adopt);}else{card.Controls.Add(Theme.Button(little.Growth<3?"알 보살피기 5 G":"펫 놀아주기 5 G",130,90,250,40,(s,e)=>CompanionAction(1),true));card.Controls.Add(Theme.Button(little.Growth<3?"영양 주기 8 G":"펫 밥 주기 8 G",396,90,250,40,(s,e)=>CompanionAction(2)));}
    L("각 캐릭터의 펫은 따로 자라요. 돌봄은 1분마다 가능해요.",0,280,720,28,10,Theme.Muted);var guide=Card(0,329,720,147);guide.Controls.Add(Theme.Label("알 → 아기 펫 → 다 자란 펫",20,16,680,30,13));guide.Controls.Add(Theme.Label("돌봄 / 놀아주기 5 G · 영양 / 밥 주기 8 G",20,55,680,26,10));guide.Controls.Add(Theme.Label("찌오의 펫은 반짝이는 둥근 아기 새로 자라요.",20,91,680,26,10,Theme.Muted)); }
-  void CompanionAction(int action){string snapshot=new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(Store.State),error;bool ok=action==0?Companions.Adopt(Store.State,out error):Companions.Care(Store.State,action==2,AppClock.Now,out error);if(!ok){GameAlert.Show(error,"작은 펫 키우기");return;}if(!Store.Save()){Store.State=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Data>(snapshot);return;}pet.ApplyPetSize();pet.Say(action==0?"새 알이 생겼어! 함께 키워보자~":"작은 펫이 무럭무럭 자라고 있어!",false);RefreshPage();}
+  void CompanionAction(int action){var current=Companions.Current(Store.State);bool playing=action==1&&current!=null&&current.Growth>=10;bool playExperience=action==1&&current!=null&&current.Growth>=3;string snapshot=new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(Store.State),error;bool ok=action==0?Companions.Adopt(Store.State,out error):Companions.Care(Store.State,action==2,AppClock.Now,out error);if(!ok){GameAlert.Show(error,"작은 펫 키우기");return;}if(playExperience){Store.State.InteractionExperience+=5;Store.State.LastInteractionLocal=AppClock.Encode(AppClock.Now);}if(!Store.Save()){Store.State=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Data>(snapshot);return;}pet.ApplyPetSize();if(playing)pet.PlayWithCompanion();pet.Say(action==0?"새 알이 생겼어! 함께 키워보자~":playExperience?"작은 펫과 놀았어! +5 EXP":"작은 펫이 무럭무럭 자라고 있어!",false);RefreshPage();}
   void EditSchedule(TaskItem item,string preset){if(GoogleCalendar.Imported(item)){GameAlert.Show("구글에서 가져온 일정은 구글 캘린더에서 수정해주세요.");return;}using(var editor=new ScheduleEditor(item,preset)){if(editor.ShowDialog(this)==DialogResult.OK)RefreshPage();}}
   void Tasks(){ questDate=AppClock.Now.Date;
    Title("QUEST BOARD","오늘의 일정과 퀘스트","한국시간 · "+AppClock.Now.ToString("MM/dd (ddd) HH:mm")+" · 일정 +20 G / 야근 -20 G");
@@ -291,17 +291,19 @@ namespace DeskBuddy {
   }
 
   void Game(){
-   Title("MINIGAMES / PLAY WITH YOUR BUDDY","친구와 미니게임","배구 · 마법의 성 · 하늘에서 똥 피하기, 함께 도전해요!");
-   Add(new VolleyballPreview(pet){Location=new Point(0,111),Size=new Size(744,310)});
-   L("← → 또는 A/D 이동   SPACE 점프   ↓ 또는 X 스매시",0,437,744,28);
-   L("ESC 일시정지 / 다른 창 전환 시 자동 정지 / R 다시 한 판",0,468,744,28,10,Theme.Muted);
-   B("바탕화면 배구 시작",0,507,232,48,(s,e)=>pet.StartVolleyball(),true);
-   B("마법의 성 모험 시작",244,507,232,48,(s,e)=>pet.StartCastle(),true);
-   var dodge=B("똥 피하기 시작",488,507,232,48,(s,e)=>pet.StartDodge(),true);dodge.Enabled=Companions.Level(Store.State)>=2;if(!dodge.Enabled)dodge.Text="똥 피하기 · Lv.2";
-   L("화살표로 피하기 · 20 / 25 / 30초 생존 · 3탄 모두 통과하면 +50 G",0,567,744,28,10,Theme.Muted);
-   var advanced=B("마법의 성 4·5탄 · Lv.3 · 클리어 +100 G",0,648,720,46,(s,e)=>pet.StartCastleAdvanced(),true);advanced.Enabled=Companions.Level(Store.State)>=3;
+   Title("MINIGAMES / PLAY WITH YOUR BUDDY","친구와 미니게임","레벨 1 똥 피하기 · 레벨 2 농구 · 레벨 3 마법의 성 · 레벨 5 배구");
+   GameCard("똥 피하기","하늘에서 똥 피하기","화살표 이동 · 20 / 25 / 30초 생존 · 3탄 클리어 +50 G","똥 피하기 시작",111,()=>pet.StartDodge());
+   GameCard("농구","움직이는 골대 농구 · 3탄","← → 조준 · SPACE 누르고 떼서 슛 · 골대 / 수비 / 바람 · +50 G","농구 시작",233,()=>pet.StartBasketball());
+   GameCard("마법의 성","마법의 성 · 1~3탄 모험","이동 / 점프 / 마법 · 별 3개와 꼭대기 문 · 3탄 클리어 +50 G","마법의 성 모험 시작",355,()=>pet.StartCastle());
+   GameCard("배구","바탕화면 배구","← → 이동 · SPACE 점프 · ↓ 스매시 · 승리 +20 G / 패배 +5 G","바탕화면 배구 시작",477,()=>pet.StartVolleyball());
    int played=Store.State.GamesDate==AppClock.Now.ToString("yyyy-MM-dd")?Store.State.GamesPlayed:0;
-   L("성 / 똥 피하기 3탄 +50 G · 배구 승리 +20 G · 오늘 "+played+" / 3",0,607,744,20,10,Theme.Muted);
+   L("네 게임 보상 합산 하루 3회 · 오늘 "+played+" / 3 · 집중 중에는 게임을 시작할 수 없어요.",0,605,744,28,10,Theme.Muted);
+   L("ESC/P 일시정지 · 다른 창 전환 시 자동 정지 · R 처음부터 다시 도전",0,641,744,28,10,Theme.Muted);
+  }
+  void GameCard(string key,string title,string detail,string start,int y,Action launch){
+   int required=Progression.GameLevel(key);bool unlocked=Companions.Level(Store.State)>=required;var card=Card(0,y,744,110);
+   card.Controls.Add(Theme.Label(title+" · Lv."+required,16,10,700,29,13));card.Controls.Add(Theme.Label(detail,16,46,700,25,9,Theme.Muted));
+   var button=Theme.Button(unlocked?start:key+" · Lv."+required,460,76,268,28,(s,e)=>launch(),true);button.Enabled=unlocked;card.Controls.Add(button);
   }
 
   void Shop(){

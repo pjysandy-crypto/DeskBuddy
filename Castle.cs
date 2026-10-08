@@ -11,28 +11,27 @@ namespace DeskBuddy {
  public class CastleShot {public float X,Y;public int Direction;}
  public class CastleEngine {
   public const int WorldHeight=1660;
-  public readonly bool Advanced;public int FirstStage{get{return Advanced?4:1;}}public int LastStage{get{return Advanced?5:3;}}public int WinCoins{get{return Advanced?100:50;}}public int Stage{get;private set;}public bool StageClear{get;private set;}
+  public int FirstStage{get{return 1;}}public int LastStage{get{return 3;}}public int WinCoins{get{return 50;}}public int Stage{get;private set;}public bool StageClear{get;private set;}
   public float DoorX{get{return Platforms[14].X+Platforms[14].Width/2;}}
-  public string StageName{get{return Stage==1?"작은 성":Stage==2?"바람의 탑":Stage==3?"어둠의 성":Stage==4?"폭풍의 성":"황금 마법탑";}}
+  public string StageName{get{return Stage==1?"작은 성":Stage==2?"바람의 탑":"어둠의 성";}}
   public List<RectangleF> Platforms=new List<RectangleF>();
   public List<PointF> Stars=new List<PointF>();public List<bool> Collected=new List<bool>();
   public List<CastleEnemy> Enemies=new List<CastleEnemy>();public List<CastleShot> Shots=new List<CastleShot>();
   public float X=170,Y=WorldHeight-80,Vy;public int Facing=1,Lives=3,Count;public bool Won,Over,Grounded;
   public int MagicLeft=3;public float Invincible;float cooldown;bool jumpHeld,magicHeld,awarded;
-  public CastleEngine(bool advanced=false){Advanced=advanced;Stage=FirstStage;BuildStage();}
+  public CastleEngine(){Stage=FirstStage;BuildStage();}
   void BuildStage(){
    Platforms.Clear();Stars.Clear();Collected.Clear();Enemies.Clear();Shots.Clear();
    X=170;Y=WorldHeight-80;Vy=0;Facing=1;Lives=3;Count=0;Grounded=false;Invincible=0;cooldown=0;jumpHeld=false;magicHeld=false;StageClear=false;
-   int gap=Stage==1?104:Stage==2?110:112;float width=Stage==1?240:Stage==2?190:Stage==3?145:Stage==4?135:115;
+   int gap=Stage==1?104:Stage==2?110:112;float width=Stage==1?240:Stage==2?190:145;
    int[] second={430,260,460,290,470,280,440,270,460,300,470,290,440,270};
    int[] third={420,220,420,570,380,220,420,570,390,220,420,570,380,260};
-   int[] fourth={320,510,340,170,350,540,350,170,360,550,360,180,370,540};int[] fifth={300,500,320,140,330,520,340,160,350,540,360,180,370,550};
    Platforms.Add(new RectangleF(0,WorldHeight-40,780,40));
    for(int i=1;i<=14;i++){
-    float center=Stage==1?(i%2==0?270:430):Stage==2?second[i-1]:Stage==3?third[i-1]:Stage==4?fourth[i-1]:fifth[i-1];float x=center-width/2,y=WorldHeight-40-i*gap;
+    float center=Stage==1?(i%2==0?270:430):Stage==2?second[i-1]:third[i-1];float x=center-width/2,y=WorldHeight-40-i*gap;
     Platforms.Add(new RectangleF(x,y,width,16));
     if(i%4==0){Stars.Add(new PointF(center,y-28));Collected.Add(false);}
-    if(Stage==1?i%3==0:i%2==0||Stage>=3&&i%3==0)Enemies.Add(new CastleEnemy{X=center+(Stage==1?30:0),Home=center,Y=y-18,Speed=Stage==1?65:Stage==2?95:Stage==3?130:Stage==4?160:185,Range=Stage==1?85:width/2-24,Health=Stage>=3?(Stage==5?3:2):1});
+    if(Stage==1?i%3==0:i%2==0||Stage>=3&&i%3==0)Enemies.Add(new CastleEnemy{X=center+(Stage==1?30:0),Home=center,Y=y-18,Speed=Stage==1?65:Stage==2?95:130,Range=Stage==1?85:width/2-24,Health=Stage>=3?2:1});
    }
   }
   public bool NextStage(){if(!StageClear||Over||Stage>=LastStage)return false;Stage++;BuildStage();return true;}
@@ -56,18 +55,18 @@ namespace DeskBuddy {
    if(Count==Stars.Count&&Grounded&&Y==Platforms[14].Y&&Math.Abs(X-DoorX)<55){if(Stage==LastStage){Won=true;Over=true;}else StageClear=true;}
   }
   void Damage(){if(Invincible>0||Over)return;Lives--;Invincible=1.8f;if(Lives<=0)Over=true;}
-  public int Award(Data data,DateTime now){if(!Over||awarded)return -2;awarded=true;return Rules.CastleReward(data,Won,now,Advanced);}
+  public int Award(Data data,DateTime now){if(!Over||awarded)return -2;awarded=true;return Rules.CastleReward(data,Won,now);}
  }
  public class CastleForm:Form {
   public CastleEngine Engine=new CastleEngine();CastleInput input=new CastleInput();Timer timer=new Timer{Interval=16};Stopwatch watch=new Stopwatch();double previous,accumulator;
-  bool started,paused;int reward=-2;PetForm owner;bool advanced;
-  public CastleForm(PetForm pet,bool advanced=false){
-   this.advanced=advanced;Engine=new CastleEngine(advanced);
+  bool started,paused;int reward=-2;PetForm owner;
+  public CastleForm(PetForm pet){
+   Engine=new CastleEngine();
    owner=pet;Icon=AppIdentity.Icon;Text="DeskBuddy · 마법의 성 모험";ClientSize=new Size(780,600);StartPosition=FormStartPosition.CenterScreen;BackColor=Color.FromArgb(28,28,57);DoubleBuffered=true;KeyPreview=true;
    timer.Tick+=(s,e)=>Tick();Shown+=(s,e)=>{watch.Start();timer.Start();};Deactivate+=(s,e)=>{input=new CastleInput();if(started&&!Engine.Over)paused=true;Invalidate();};
    MouseDown+=(s,e)=>{if(new Rectangle(235,280,310,48).Contains(e.Location)&&(!started||paused||Engine.Over||Engine.StageClear))Start();};
   }
-  void Start(){if(Engine.Over){Engine=new CastleEngine(advanced);reward=-2;}else if(Engine.StageClear)Engine.NextStage();started=true;paused=false;input=new CastleInput();accumulator=0;Invalidate();}
+  void Start(){if(Engine.Over){Engine=new CastleEngine();reward=-2;}else if(Engine.StageClear)Engine.NextStage();started=true;paused=false;input=new CastleInput();accumulator=0;Invalidate();}
   void Tick(){double now=watch.Elapsed.TotalSeconds,elapsed=Math.Min(.08,now-previous);previous=now;
    if(started&&!paused&&!Engine.Over&&!Engine.StageClear){accumulator+=elapsed;while(accumulator>=1.0/120){Engine.Step(1f/120,input);accumulator-=1.0/120;}
     if(Engine.Over){reward=Engine.Award(Store.State,AppClock.Now);if(reward>=0)Store.Save();owner.Say(Engine.Won?(reward>=0?Engine.LastStage+"탄까지 클리어! +"+reward+" G":Engine.LastStage+"탄까지 클리어! 멋져!"):"다음에는 꼭 성 꼭대기까지!",false);}}
@@ -76,7 +75,7 @@ namespace DeskBuddy {
   protected override bool IsInputKey(Keys keyData){Keys k=keyData&Keys.KeyCode;return k==Keys.Left||k==Keys.Right||k==Keys.Up||base.IsInputKey(keyData);}
   protected override void OnKeyDown(KeyEventArgs e){base.OnKeyDown(e);Keys k=e.KeyCode;
    if(k==Keys.Enter){Start();}else if(k==Keys.Escape||k==Keys.P){paused=!paused;input=new CastleInput();}
-   else if(k==Keys.R){Engine=new CastleEngine(advanced);reward=-2;started=false;paused=false;input=new CastleInput();}
+   else if(k==Keys.R){Engine=new CastleEngine();reward=-2;started=false;paused=false;input=new CastleInput();}
    else{if(k==Keys.Left||k==Keys.A)input.Left=true;if(k==Keys.Right||k==Keys.D)input.Right=true;if(k==Keys.Space||k==Keys.Up||k==Keys.W)input.Jump=true;if(k==Keys.Z||k==Keys.X)input.Magic=true;}
    e.SuppressKeyPress=true;Invalidate();
   }
@@ -128,11 +127,10 @@ namespace DeskBuddy {
    d=new Data{GamesDate=AppClock.Now.ToString("yyyy-MM-dd"),GamesPlayed=3};Check(Rules.CastleReward(d,true,AppClock.Now)==-1&&d.Coins==30,"shared daily limit");
    Check(Rules.CastleReward(d,true,AppClock.Now.AddDays(1))==50&&d.GamesPlayed==1,"castle daily reset");
    var limited=new CastleEngine();limited.Enemies.Clear();for(int n=0;n<4;n++){limited.Step(.01f,new CastleInput{Magic=true});for(int t=0;t<12;t++)limited.Step(.03f,new CastleInput());}Check(limited.MagicLeft==0,"magic limited to three casts");limited.Count=3;limited.X=limited.DoorX;limited.Y=limited.Platforms[14].Y;limited.Vy=0;limited.Step(.001f,new CastleInput());Check(limited.NextStage()&&limited.MagicLeft==0,"magic budget persists between stages");Check(new CastleEngine().MagicLeft==3,"restart restores magic");
-   var extra=new CastleEngine(true);d=new Data();Check(extra.Stage==4&&extra.Platforms[1].Width==135,"advanced stage four");extra.Count=3;extra.X=extra.DoorX;extra.Y=extra.Platforms[14].Y;extra.Step(.001f,new CastleInput());Check(extra.StageClear&&extra.Award(d,AppClock.Now)==-2&&extra.NextStage(),"four then five");Check(extra.Stage==5&&extra.Enemies[0].Health==3&&extra.MagicLeft==3,"harder stage five");extra.Count=3;extra.X=extra.DoorX;extra.Y=extra.Platforms[14].Y;extra.Step(.001f,new CastleInput());Check(extra.Won&&extra.Award(d,AppClock.Now)==100&&extra.Award(d,AppClock.Now)==-2&&d.Coins==130,"advanced hundred coins once");
-   PlayableCourse();PlayableCourse(true);
+   PlayableCourse();
   }
-  static void PlayableCourse(bool advanced=false){
-   var e=new CastleEngine(advanced);
+  static void PlayableCourse(){
+   var e=new CastleEngine();
    for(int stage=e.FirstStage;stage<=e.LastStage;stage++){
     foreach(var enemy in e.Enemies)enemy.Alive=false;
     for(int t=0;t<90;t++)e.Step(1f/120,new CastleInput());
