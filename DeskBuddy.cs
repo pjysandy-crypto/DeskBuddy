@@ -34,6 +34,7 @@ namespace DeskBuddy {
   public string PetName="스누피", ImagePath="", Equipped="기본"; public int PixelSize=3; public int PetSize=140; public int BubbleScale=100; public int FocusTimerScale=100; public Dictionary<string,LittlePet> Companions=new Dictionary<string,LittlePet>();
   public List<MemoNote> Memos=new List<MemoNote>(); public List<string> Owned=new List<string>{"기본"}; public List<TaskItem> Tasks=new List<TaskItem>();
   public List<ProjectItem> Projects=new List<ProjectItem>(); public List<WorkDiaryItem> Diaries=new List<WorkDiaryItem>();
+  public List<KpiItem> Kpis=new List<KpiItem>(); public List<MonthlyReport> MonthlyReports=new List<MonthlyReport>(); public string AiProvider="Claude"; public Dictionary<string,string> AiModels=new Dictionary<string,string>();
   public bool Wander=true, Quiet=false; public bool Cartwheels=true; public List<string> CharacterSamples=new List<string>(); public DateTime FocusEnd=DateTime.MinValue; public string FocusEndLocal=""; public int SessionMinutes; public string GamesDate=""; public int GamesPlayed;
  }
  public static class Store {
@@ -416,6 +417,9 @@ namespace DeskBuddy {
   }
 
   static int SelfTest(){
+   // Tests call Store.Save() indirectly (e.g. diary rewards); keep them away from the user's real data.json.
+   string realPath=Store.FilePath;string sandbox=Path.Combine(Path.GetTempPath(),"DeskBuddy-selftest-"+Guid.NewGuid().ToString("N"));
+   Directory.CreateDirectory(sandbox);Store.FilePath=Path.Combine(sandbox,"data.json");
    try{
     StickyMemos.Tests();FocusTimerArt.Tests();CalendarDates.Tests();GoogleCalendar.Tests();CastleTests.Run();DodgeEngine.Tests();Progression.Tests();
     LivingTests.Run();Companions.Tests();AdminAccess.Tests();using(var image=new Bitmap(500,200))using(var g=Graphics.FromImage(image)){foreach(int scale in new[]{60,100,160}){var bounds=new Rectangle(0,0,(int)(246*scale/100.0),(int)(54*scale/100.0));using(var font=Theme.BubbleFont(g,"일정 알림",bounds,scale))if(Math.Abs(font.Size-16*scale/100f)>0.01f)throw new Exception("Bubble font proportional scale");using(var font=Theme.BubbleFont(g,"긴 일정 알림입니다. 회의 준비와 자료 확인을 마치고 참석해주세요.",bounds,scale))if(g.MeasureString("긴 일정 알림입니다. 회의 준비와 자료 확인을 마치고 참석해주세요.",font,bounds.Width).Height>bounds.Height)throw new Exception("Bubble text fit");}}
@@ -441,6 +445,7 @@ namespace DeskBuddy {
     if(restored.Tasks.Count!=1||!restored.Tasks[0].Done||restored.Coins!=35)throw new Exception("JSON");
     using(var bmp=new Bitmap(180,180))using(var g=Graphics.FromImage(bmp))PetArt.Draw(g,new Rectangle(0,0,180,180),1,true,"왕관");return 0;
    }catch{return 1;}
+   finally{Store.FilePath=realPath;try{Directory.Delete(sandbox,true);}catch{}}
   }
  }
 }

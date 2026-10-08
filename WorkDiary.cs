@@ -74,6 +74,7 @@ namespace DeskBuddy {
 					if (String.IsNullOrEmpty(entry.Id)) entry.Id = Guid.NewGuid().ToString("N");
 				}
 			}
+			MonthlyReports.Normalize(d);
 		}
 
 		public static WorkDiaryItem GetOrCreateDiary(Data d, string date) {
@@ -309,6 +310,7 @@ namespace DeskBuddy {
 	public static class DiaryTests {
 		public static void Run() {
 			DiaryCore.Tests();
+			MonthlyReports.Tests();
 		}
 	}
 
@@ -472,15 +474,15 @@ namespace DeskBuddy {
 		}
 	}
 
-	public class WorkDiaryPanel : Panel {
+	public partial class WorkDiaryPanel : Panel {
 		MainForm parent;
 		PetForm pet;
 		DateTime selectedDate = AppClock.Now.Date;
-		string mode = "daily"; // daily, byProject, manageProjects
+		string mode = "daily"; // daily, byProject, manageProjects, monthly
 		string selectedProjectId = "";
 
 		Panel mainContent;
-		Button tabDaily, tabByProject, tabManage;
+		Button tabDaily, tabByProject, tabManage, tabMonthly;
 
 		const int CARD_WIDTH = 668;
 
@@ -518,15 +520,18 @@ namespace DeskBuddy {
 			y += 28;
 
 			// Mode Tabs
-			tabDaily = Theme.Button("일자별 일지 작성", 14, y, 210, 38, (s, e) => { mode = "daily"; RefreshMode(); });
-			tabByProject = Theme.Button("프로젝트별 모아보기", 232, y, 220, 38, (s, e) => { mode = "byProject"; RefreshMode(); });
-			tabManage = Theme.Button("나의 프로젝트 관리", 460, y, 222, 38, (s, e) => { mode = "manageProjects"; RefreshMode(); });
+			tabDaily = Theme.Button("일자별 일지 작성", 14, y, 160, 38, (s, e) => { mode = "daily"; RefreshMode(); });
+			tabByProject = Theme.Button("프로젝트 모아보기", 180, y, 168, 38, (s, e) => { mode = "byProject"; RefreshMode(); });
+			tabManage = Theme.Button("나의 프로젝트 관리", 354, y, 164, 38, (s, e) => { mode = "manageProjects"; RefreshMode(); });
+			tabMonthly = Theme.Button("월간 리포트 AI", 524, y, 158, 38, (s, e) => { mode = "monthly"; RefreshMode(); });
 			tabDaily.ForeColor = Theme.Ink;
 			tabByProject.ForeColor = Theme.Ink;
 			tabManage.ForeColor = Theme.Ink;
+			tabMonthly.ForeColor = Theme.Ink;
 			Controls.Add(tabDaily);
 			Controls.Add(tabByProject);
 			Controls.Add(tabManage);
+			Controls.Add(tabMonthly);
 			y += 48;
 
 			// Main Content container
@@ -551,9 +556,14 @@ namespace DeskBuddy {
 			tabManage.ForeColor = Theme.Ink;
 			tabManage.Invalidate();
 
+			tabMonthly.BackColor = mode == "monthly" ? Theme.Gold : Theme.Cream;
+			tabMonthly.ForeColor = Theme.Ink;
+			tabMonthly.Invalidate();
+
 			mainContent.Controls.Clear();
 			if (mode == "daily") RenderDailyView();
 			else if (mode == "byProject") RenderByProjectView();
+			else if (mode == "monthly") RenderMonthlyReportView();
 			else RenderManageProjectsView();
 		}
 
