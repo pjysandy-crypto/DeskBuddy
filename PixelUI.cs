@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -135,7 +135,7 @@ namespace DeskBuddy {
     R(g,"#76553F",314,102,44,4);R(g,"#5A7D84",318,107,36,6);R(g,"#C5DFD0",322,109,28,3);
     LivingArt.Room(g,decor);if(wallpaper=="축제 벽지"){for(int i=0;i<7;i++){R(g,i%2==0?"#E89BB0":"#EAC96B",124+i*21,12+i%2*8,9,12);R(g,"#7A937F",128+i*21,24+i%2*8,1,12);}}if(wallpaper=="왕실 벽지"){R(g,"#D9BA75",130,3,5,85);R(g,"#D9BA75",257,3,5,85);R(g,"#6D5287",137,4,118,15);R(g,"#F0D29B",184,5,24,10);}if(ShowPet)Progression.Sparkles(g,new Rectangle(125,60,140,80),frame,false);
     var fed=AppClock.Decode(decor.LastFedLocal,DateTime.MinValue);if(ShowPet&&fed!=DateTime.MinValue&&AppClock.Now>=fed&&AppClock.Now<fed.AddSeconds(5))LivingArt.Food(g,decor.LastFood,new Rectangle(208,99,34,34));
-    if(ShowPet)Companions.Draw(g,new Rectangle(221,132-Companions.SizeFor(74),Companions.SizeFor(74),Companions.SizeFor(74)),Store.State,frame);
+    if(ShowPet)Companions.Draw(g,new Rectangle(206,132-Companions.SizeFor(74,Store.State),Companions.SizeFor(74,Store.State),Companions.SizeFor(74,Store.State)),Store.State,frame);
     if(ShowPet&&!PetArt.HasCustom)PetArt.Draw(g,new Rectangle(139,58+(frame%2),74,74),frame,false,Progression.Accessory(Store.State));
     if(frame%12<6){R(g,"#D98980",217,80,2,2);R(g,"#D98980",215,82,6,2);R(g,"#D98980",217,84,2,2);}
     e.Graphics.InterpolationMode=InterpolationMode.NearestNeighbor;e.Graphics.PixelOffsetMode=PixelOffsetMode.Half;e.Graphics.DrawImage(b,ClientRectangle);
@@ -248,7 +248,7 @@ namespace DeskBuddy {
   void DittoButtons(int y){if(!DittoTransformation.IsDitto(Store.State))return;bool unlocked=DittoTransformation.Unlocked(Store.State);var transform=B(unlocked?"변신":"변신 · Lv.5",0,y,350,42,(s,e)=>pet.TransformDitto(false),true);transform.Enabled=unlocked;var restore=B("메타몽으로 돌아오기",370,y,350,42,(s,e)=>pet.TransformDitto(true));restore.Enabled=!String.IsNullOrEmpty(Store.State.DittoForm);L("두 모습 중 랜덤 변신 · 메타몽의 펫과 성장 기록은 그대로 유지돼요.",0,y+48,720,28,9,Theme.Muted);}
   void CompanionPanel(){var little=Companions.Current(Store.State);var card=Card(0,112,720,151);card.Controls.Add(new CompanionPortrait{Location=new Point(16,18),Size=new Size(100,100)});card.Controls.Add(Theme.Label("작은 펫 · "+(Companions.Level(Store.State)<2?"레벨 2부터 이용 가능":Companions.Stage(little)),130,16,560,28,12));card.Controls.Add(Theme.Label(little==null?"레벨 2부터 이용 가능해요. 기존 성장 기록은 보관돼요.":little.Growth>=10?"성장 완료! 친밀도 "+little.Bond+" · 계속 함께 놀아요.":"돌봄 "+little.Growth+" / 10 · 3회 부화, 10회 성장 완료",130,50,560,25,10,Theme.Muted));
    if(little==null){var adopt=Theme.Button("알 입양하기",130,90,250,40,(s,e)=>CompanionAction(0),true);adopt.Enabled=Companions.Level(Store.State)>=2;card.Controls.Add(adopt);}else{card.Controls.Add(Theme.Button(little.Growth<3?"알 보살피기 5 G":"펫 놀아주기 5 G",130,90,250,40,(s,e)=>CompanionAction(1),true));card.Controls.Add(Theme.Button(little.Growth<3?"영양 주기 8 G":"펫 밥 주기 8 G",396,90,250,40,(s,e)=>CompanionAction(2)));}
-   L("각 캐릭터의 펫은 따로 자라요. 돌봄은 1분마다 가능해요.",0,280,720,28,10,Theme.Muted);var guide=Card(0,329,720,147);guide.Controls.Add(Theme.Label("알 → 아기 펫 → 다 자란 펫",20,16,680,30,13));guide.Controls.Add(Theme.Label("돌봄 / 놀아주기 5 G · 영양 / 밥 주기 8 G",20,55,680,26,10));guide.Controls.Add(Theme.Label("찌오의 펫은 반짝이는 둥근 아기 새로 자라요.",20,91,680,26,10,Theme.Muted)); }
+   L("각 캐릭터의 펫은 따로 자라요. 돌봄은 1분마다 가능해요.",0,280,720,28,10,Theme.Muted);var guide=Card(0,329,720,147);guide.Controls.Add(Theme.Label("알 → 아기 펫 → 다 자란 펫",20,16,680,30,13));guide.Controls.Add(Theme.Label("돌봄 / 놀아주기 5 G · 영양 / 밥 주기 8 G",20,55,680,26,10));guide.Controls.Add(Theme.Label("우사기의 펫은 아기 모습에서 성체 모습으로 자라요.",20,91,680,26,10,Theme.Muted)); }
   void CompanionAction(int action){var current=Companions.Current(Store.State);bool playing=action==1&&current!=null&&current.Growth>=10;bool playExperience=action==1&&current!=null&&current.Growth>=3;string snapshot=new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(Store.State),error;bool ok=action==0?Companions.Adopt(Store.State,out error):Companions.Care(Store.State,action==2,AppClock.Now,out error);if(!ok){GameAlert.Show(error,"작은 펫 키우기");return;}if(playExperience){Store.State.InteractionExperience+=5;Store.State.LastInteractionLocal=AppClock.Encode(AppClock.Now);}if(!Store.Save()){Store.State=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Data>(snapshot);return;}pet.ApplyPetSize();if(playing)pet.PlayWithCompanion();pet.Say(action==0?"새 알이 생겼어! 함께 키워보자~":playExperience?"작은 펫과 놀았어! +5 EXP":"작은 펫이 무럭무럭 자라고 있어!",false);RefreshPage();}
   void EditSchedule(TaskItem item,string preset){if(GoogleCalendar.Imported(item)){GameAlert.Show("구글에서 가져온 일정은 구글 캘린더에서 수정해주세요.");return;}using(var editor=new ScheduleEditor(item,preset)){if(editor.ShowDialog(this)==DialogResult.OK)RefreshPage();}}
   void Tasks(){ questDate=AppClock.Now.Date;
@@ -349,15 +349,17 @@ namespace DeskBuddy {
    var bubbleSlider=new PixelSizeSlider{Minimum=60,Maximum=160,Location=new Point(197,17),Size=new Size(315,36),Value=Store.State.BubbleScale};var bubbleLabel=Theme.Label(Store.State.BubbleScale+" %",525,20,80,30);bubbleSizing.Controls.Add(bubbleSlider);bubbleSizing.Controls.Add(bubbleLabel);bubbleSlider.ValueChanged+=(s,e)=>{Store.State.BubbleScale=bubbleSlider.Value;pet.ApplyPetSize();bubbleLabel.Text=bubbleSlider.Value+" %";Store.Save();};bubbleSizing.Controls.Add(Theme.Button("기본",607,16,98,38,(s,e)=>bubbleSlider.Value=100));
    var timerSizing=Card(0,601,720,70);timerSizing.Controls.Add(Theme.Label("집중 타이머",16,20,108,30));timerSizing.Controls.Add(Theme.Button("미리보기",120,16,74,38,(s,e)=>{using(var preview=new SizePreviewForm(pet))preview.ShowDialog(this);RefreshPage();}));
    var timerSlider=new PixelSizeSlider{Minimum=60,Maximum=180,Location=new Point(197,17),Size=new Size(315,36),Value=Store.State.FocusTimerScale};var timerLabel=Theme.Label(timerSlider.Value+" %",525,20,80,30);timerSizing.Controls.Add(timerSlider);timerSizing.Controls.Add(timerLabel);timerSlider.ValueChanged+=(s,e)=>{Store.State.FocusTimerScale=timerSlider.Value;pet.ApplyPetSize();timerLabel.Text=timerSlider.Value+" %";Store.Save();};timerSizing.Controls.Add(Theme.Button("기본",607,16,98,38,(s,e)=>timerSlider.Value=100));
-   L("기본 친구를 고르면 이름도 함께 바뀌어요.",0,689,495,28,10,Theme.Muted);
-   B("샘플 여러 개 추가",510,685,210,38,(s,e)=>AddSamples());
+   var petSizing=Card(0,683,720,70);petSizing.Controls.Add(Theme.Label("펫 크기",16,20,108,30));petSizing.Controls.Add(Theme.Button("미리보기",120,16,74,38,(s,e)=>{using(var preview=new SizePreviewForm(pet))preview.ShowDialog(this);RefreshPage();}));
+   var petSlider=new PixelSizeSlider{Minimum=50,Maximum=200,Location=new Point(197,17),Size=new Size(315,36),Value=Companions.Scale(Store.State)};var petSizeLabel=Theme.Label(petSlider.Value+" %",525,20,80,30);petSizing.Controls.Add(petSlider);petSizing.Controls.Add(petSizeLabel);petSlider.ValueChanged+=(s,e)=>{int previous=Companions.Scale(Store.State);Companions.SetScale(Store.State,petSlider.Value);if(!Store.Save()){Companions.SetScale(Store.State,previous);return;}pet.ApplyPetSize();petSizeLabel.Text=petSlider.Value+" %";Invalidate(true);};petSizing.Controls.Add(Theme.Button("기본",607,16,98,38,(s,e)=>petSlider.Value=100));
+   L("기본 친구를 고르면 이름도 함께 바뀌어요.",0,771,495,28,10,Theme.Muted);
+   B("샘플 여러 개 추가",510,767,210,38,(s,e)=>AddSamples());
    int index=0;foreach(string sample in CharacterLibrary.Samples()){
-    string path=sample;int x=index%6*120,y=index<6?111:749+(index-6)/6*166;bool selected=Store.State.ImagePath==path||(Store.State.ImagePath==""&&path==CharacterLibrary.Default);
+    string path=sample;int x=index%6*120,y=index<6?111:831+(index-6)/6*166;bool selected=Store.State.ImagePath==path||(Store.State.ImagePath==""&&path==CharacterLibrary.Default);
     var card=Card(x,y,112,160,selected?Theme.Gold:Theme.Cream);card.Controls.Add(new SamplePortrait(path){Location=new Point(6,6),Size=new Size(100,112)});
     card.Controls.Add(Theme.Button(selected?"선택됨":CharacterLibrary.Label(path),6,121,100,33,(s,e)=>SelectCharacter(path)));index++;
    }
    if(index==0)L("샘플 여러 개 추가로 이미지들을 등록해 주세요.",0,650,744,30,10,Theme.Muted);
-   DittoButtons(749+Math.Max(0,(index-6+5)/6)*166);
+   DittoButtons(831+Math.Max(0,(index-6+5)/6)*166);
 
   }
   void SelectCharacter(string path){if(!PetArt.LoadCustom(path)){GameAlert.Show("캐릭터 이미지를 읽지 못했습니다.");return;}Store.State.ImagePath=path;DittoTransformation.Restore(Store.State);if(string.IsNullOrEmpty(path)||path.StartsWith("builtin:",StringComparison.Ordinal))Store.State.PetName=CharacterLibrary.Label(string.IsNullOrEmpty(path)?CharacterLibrary.Default:path);Store.Save();pet.CharacterChanged();RefreshPage();}

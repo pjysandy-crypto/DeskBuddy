@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
@@ -16,9 +16,10 @@ namespace DeskBuddy {
   }
   public static ComboBox Times(int x,int y,int w,string text){
    var c=new ComboBox{Location=new Point(x,y),Size=new Size(w,30),Font=Theme.Font(10),BackColor=Theme.Cream,ForeColor=Theme.Ink,DropDownStyle=ComboBoxStyle.DropDown,AutoCompleteMode=AutoCompleteMode.SuggestAppend,AutoCompleteSource=AutoCompleteSource.ListItems,MaxLength=5};
-   for(int h=0;h<24;h++)for(int m=0;m<60;m+=15)c.Items.Add(h.ToString("00")+":"+m.ToString("00"));c.Text=text;return c;
+   for(int h=0;h<24;h++)for(int m=0;m<60;m+=15)c.Items.Add(h.ToString("00")+":"+m.ToString("00"));SetTime(c,text);return c;
   }
-  public DateTime Value{get{DateTime t;if(!TryValue(out t))throw new FormatException("시간은 09:00처럼 입력해주세요.");return t;}set{DatePicker.Value=value.Date;TimeInput.Text=value.ToString("HH:mm");}}
+  public static void SetTime(ComboBox input,string text){input.SelectedIndex=input.Items.IndexOf(text);input.Text=text;}
+  public DateTime Value{get{DateTime t;if(!TryValue(out t))throw new FormatException("시간은 09:00처럼 입력해주세요.");return t;}set{DatePicker.Value=value.Date;SetTime(TimeInput,value.ToString("HH:mm"));}}
   public bool TryValue(out DateTime value){TimeSpan time;value=DatePicker.Value.Date;if(!AppClock.Time(TimeInput.Text,out time))return false;value=DateTime.SpecifyKind(value+time,DateTimeKind.Unspecified);return true;}
   public void SetDate(DateTime day){DatePicker.Value=day.Date;}
  }
@@ -40,15 +41,15 @@ namespace DeskBuddy {
  }
  public class ScheduleEditor:Form {
   public TextBox TitleInput;public ScheduleDateTimePicker DateTimeInput;public ComboBox RepeatInput,CategoryInput,EveTimeInput,DurationInput;
-  public ComboBox EndTimeInput; public PixelToggle EndNextDay; public PixelToggle EveToggle,AllDayToggle;TaskItem existing;string picturePath="";SchedulePicture preview;Label clockLabel;
+  public ComboBox WeekdayInput; public ComboBox EndTimeInput; public PixelToggle EndNextDay; public PixelToggle EveToggle,AllDayToggle;TaskItem existing;string picturePath="";SchedulePicture preview;Label clockLabel;
   int selectedDuration=60;Label rangeSummary;Button[] durationButtons; Timer clock=new Timer{Interval=1000};
   public ScheduleEditor(TaskItem item,string preset=""){
-   existing=item;Icon=AppIdentity.Icon;Text=item==null?"새 일정":"일정 수정";AutoScaleMode=AutoScaleMode.None;ClientSize=new Size(760,710);
+   existing=item;Icon=AppIdentity.Icon;Text=item==null?"새 일정":"일정 수정";AutoScaleMode=AutoScaleMode.None;ClientSize=new Size(760,754);
    StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.None;BackColor=Theme.Bg;Font=Theme.Font(10);DoubleBuffered=true;
    Controls.Add(Theme.Label("SCHEDULE / "+(item==null?"새 일정":"일정 수정"),22,18,620,30,14));
    Controls.Add(Theme.Button("X",704,12,40,40,(s,e)=>{DialogResult=DialogResult.Cancel;Close();}));
    clockLabel=Theme.Label("",22,53,706,28,10,Theme.Muted);Controls.Add(clockLabel);UpdateClock();
-   var form=new PixelPanel{Location=new Point(16,92),Size=new Size(728,340)};Controls.Add(form);
+   var form=new PixelPanel{Location=new Point(16,92),Size=new Size(728,384)};Controls.Add(form);
    form.Controls.Add(Theme.Label("일정 이름",16,10,480,24));
    TitleInput=Theme.Input(item==null?"":item.Title,16,38,471);TitleInput.MaxLength=100;form.Controls.Add(TitleInput);
    CategoryInput=Choice(new[]{"업무","회의","마감","개인","휴식","출근","퇴근","휴가","야근"},503,38,207);form.Controls.Add(CategoryInput);
@@ -70,11 +71,12 @@ namespace DeskBuddy {
    rangeSummary=Theme.Label("",16,277,696,20,10,Theme.Purple);form.Controls.Add(rangeSummary);
    form.Controls.Add(Theme.Label("반복",16,305,60,28));RepeatInput=Choice(new[]{"한 번","매일","평일","매주"},82,305,238);form.Controls.Add(RepeatInput);
    form.Controls.Add(Theme.Label("종일 일정",408,305,168,28,10,Theme.Muted));AllDayToggle=new PixelToggle{Location=new Point(604,301),Text="종일 일정"};form.Controls.Add(AllDayToggle);
-   var eve=new PixelPanel{Location=new Point(16,448),Size=new Size(728,68)};Controls.Add(eve);
+   form.Controls.Add(Theme.Label("반복 요일",16,347,100,28));WeekdayInput=Choice(new[]{"일요일","월요일","화요일","수요일","목요일","금요일","토요일"},122,347,198);form.Controls.Add(WeekdayInput);form.Controls.Add(Theme.Label("매주 반복할 요일을 선택하세요.",338,347,374,28,10,Theme.Muted));
+   var eve=new PixelPanel{Location=new Point(16,492),Size=new Size(728,68)};Controls.Add(eve);
    eve.Controls.Add(Theme.Label("전날 미리 알림",16,12,260,24));eve.Controls.Add(Theme.Label("내일 일정과 휴가를 먼저 알려줘요.",16, 40,450,24,10,Theme.Muted));
    EveToggle=new PixelToggle{Location=new Point(468, 20),Text="전날 미리 알림"};eve.Controls.Add(EveToggle);
    EveTimeInput=ScheduleDateTimePicker.Times(590,24,121,"18:00");eve.Controls.Add(EveTimeInput);
-   var appearance=new PixelPanel{Location=new Point(16,532),Size=new Size(728,82)};Controls.Add(appearance);
+   var appearance=new PixelPanel{Location=new Point(16,576),Size=new Size(728,82)};Controls.Add(appearance);
    preview=new SchedulePicture{Location=new Point(16,8),Size=new Size(64,64)};appearance.Controls.Add(preview);
    appearance.Controls.Add(Theme.Label("일정 중 캐릭터 모습",96,8,300,24));
    appearance.Controls.Add(Theme.Button("PNG 선택",420,14,138,36,(s,e)=>ChoosePicture()));
@@ -82,9 +84,9 @@ namespace DeskBuddy {
    appearance.Controls.Add(Theme.Label("시작~종료 시간 동안 선택한 모습을 유지해요.",96,44,608,24,10,Theme.Muted));
    DurationInput=Choice(new[]{"30분","1시간","2시간"},322,100,200);DurationInput.Visible=false;appearance.Controls.Add(DurationInput);
 
-   Controls.Add(Theme.Label("일정 완료 +20 G / 야근 분류 또는 제목에 '야근' 포함: 완료 -20 G (최저 0 G)",22,625,714,30,10,Theme.Muted));
-   Controls.Add(Theme.Button(item==null?"+ 일정 추가":"변경 저장", 16,658,470, 40,(s,e)=>{string error;if(!TrySave(out error))GameAlert.Show(error,"일정 설정");},true));
-   Controls.Add(Theme.Button("취소",503,658,241, 40,(s,e)=>{DialogResult=DialogResult.Cancel;Close();}));
+   Controls.Add(Theme.Label("일정 완료 +20 G / 야근 분류 또는 제목에 '야근' 포함: 완료 -20 G (최저 0 G)",22,669,714,30,10,Theme.Muted));
+   Controls.Add(Theme.Button(item==null?"+ 일정 추가":"변경 저장", 16,702,470, 40,(s,e)=>{string error;if(!TrySave(out error))GameAlert.Show(error,"일정 설정");},true));
+   Controls.Add(Theme.Button("취소",503,702,241, 40,(s,e)=>{DialogResult=DialogResult.Cancel;Close();}));
    if(item!=null){
     DateTimeInput.Value=Scheduler.Due(item);TitleInput.Text=item.Title;CategoryInput.SelectedItem=item.Category;RepeatInput.SelectedItem=item.Repeat;AllDayToggle.Checked=item.AllDay;EveToggle.Checked=item.EveReminder;EveTimeInput.Text=item.EveTime;
     DurationInput.SelectedIndex=item.AppearanceMinutes>=120?2:item.AppearanceMinutes>=60?1:0;picturePath=item.ScheduleImage;
@@ -98,16 +100,17 @@ namespace DeskBuddy {
    }else if(preset=="휴가"){
     TitleInput.Text="휴가";CategoryInput.SelectedItem="휴가";DateTimeInput.Value=AppClock.Now.Date.AddDays(1).AddHours(9);AllDayToggle.Checked=true;EveToggle.Checked=true;
    }
-   DateTime finish=item!=null&&item.DurationMinutes>0?Scheduler.End(item):DateTimeInput.Value.AddHours(1);EndTimeInput.Text=finish.ToString("HH:mm");EndNextDay.Checked=finish.Date>DateTimeInput.Value.Date;DateTimeInput.TimeInput.TextChanged+=(s,e)=>{DateTime start;if(DateTimeInput.TryValue(out start)){var end=start.AddMinutes(selectedDuration);EndTimeInput.Text=end.ToString("HH:mm");EndNextDay.Checked=end.Date>start.Date;}};
+   DateTime finish=item!=null&&item.DurationMinutes>0?Scheduler.End(item):DateTimeInput.Value.AddHours(1);ScheduleDateTimePicker.SetTime(EndTimeInput,finish.ToString("HH:mm"));EndNextDay.Checked=finish.Date>DateTimeInput.Value.Date;DateTimeInput.TimeInput.TextChanged+=(s,e)=>{DateTime start;if(DateTimeInput.TryValue(out start)){var end=start.AddMinutes(selectedDuration);ScheduleDateTimePicker.SetTime(EndTimeInput,end.ToString("HH:mm"));EndNextDay.Checked=end.Date>start.Date;}};
    EndTimeInput.Enabled=EndNextDay.Enabled=!AllDayToggle.Checked;AllDayToggle.CheckedChanged+=(s,e)=>EndTimeInput.Enabled=EndNextDay.Enabled=!AllDayToggle.Checked;
    EveTimeInput.Enabled=EveToggle.Checked;EveToggle.CheckedChanged+=(s,e)=>EveTimeInput.Enabled=EveToggle.Checked;
    DurationInput.Enabled=!AllDayToggle.Checked;AllDayToggle.CheckedChanged+=(s,e)=>DurationInput.Enabled=!AllDayToggle.Checked;
    EndTimeInput.TextChanged+=(s,e)=>UpdateRange();EndNextDay.CheckedChanged+=(s,e)=>UpdateRange();AllDayToggle.CheckedChanged+=(s,e)=>UpdateRange();DateTimeInput.TimeInput.TextChanged+=(s,e)=>UpdateRange();UpdateRange();
+   WeekdayInput.SelectedIndex=(int)DateTimeInput.DatePicker.Value.DayOfWeek;WeekdayInput.Enabled=RepeatInput.Text=="매주";RepeatInput.SelectedIndexChanged+=(s,e)=>{WeekdayInput.Enabled=RepeatInput.Text=="매주";if(WeekdayInput.Enabled)WeekdayInput.SelectedIndex=(int)DateTimeInput.DatePicker.Value.DayOfWeek;};WeekdayInput.SelectedIndexChanged+=(s,e)=>{if(RepeatInput.Text=="매주"){DateTime day=DateTimeInput.DatePicker.Value.Date;DateTimeInput.SetDate(day.AddDays((WeekdayInput.SelectedIndex-(int)day.DayOfWeek+7)%7));}};
    clock.Tick+=(s,e)=>UpdateClock();clock.Start();FormClosed+=(s,e)=>clock.Dispose();
   }
   
   static void StyleTime(ComboBox input,Panel card){card.Controls.Add(input);input.Location=new Point(14,34);input.Size=new Size(card.Width-28,36);input.Font=Theme.PixelFont(26);input.FlatStyle=FlatStyle.Flat;input.BackColor=card.BackColor;input.ForeColor=Theme.Ink;input.AccessibleName=card.Controls[0].Text;input.IntegralHeight=false;input.DropDownHeight=200;}
-  void SetDuration(int minutes){DateTime start;if(!DateTimeInput.TryValue(out start))return;DateTime end=start.AddMinutes(minutes);EndTimeInput.Text=end.ToString("HH:mm");EndNextDay.Checked=end.Date>start.Date;UpdateRange();}
+  void SetDuration(int minutes){DateTime start;if(!DateTimeInput.TryValue(out start))return;DateTime end=start.AddMinutes(minutes);ScheduleDateTimePicker.SetTime(EndTimeInput,end.ToString("HH:mm"));EndNextDay.Checked=end.Date>start.Date;UpdateRange();}
   void UpdateRange(){bool enabled=!AllDayToggle.Checked;DateTimeInput.TimeInput.Enabled=EndTimeInput.Enabled=EndNextDay.Enabled=enabled;foreach(var button in durationButtons){button.Enabled=enabled;button.BackColor=Theme.Cream;}if(!enabled){rangeSummary.ForeColor=Theme.Purple;rangeSummary.Text="하루 전체 일정";return;}DateTime start;TimeSpan time;if(!DateTimeInput.TryValue(out start)||!AppClock.Time(EndTimeInput.Text,out time)){rangeSummary.ForeColor=Color.FromArgb(177,90,105);rangeSummary.Text="시간을 14:00처럼 입력해주세요.";return;}DateTime end=start.Date+time;if(EndNextDay.Checked)end=end.AddDays(1);int minutes=(int)(end-start).TotalMinutes;if(minutes>0)selectedDuration=minutes;rangeSummary.ForeColor=minutes>0?Theme.Purple:Color.FromArgb(177,90,105);rangeSummary.Text=minutes>0?"총 "+(minutes/60>0?minutes/60+"시간 ":"")+(minutes%60>0?minutes%60+"분":"")+"  ·  "+start.ToString("HH:mm")+" ~ "+end.ToString("HH:mm")+(EndNextDay.Checked?" (다음날)":""):"종료 시간을 시작 시간보다 늦게 설정해주세요.";int[] values={30,60,90,120};for(int i=0;i<values.Length;i++)if(minutes==values[i])durationButtons[i].BackColor=Theme.Gold;}
   static ComboBox Choice(string[] options,int x,int y,int w){
    var c=new ComboBox{Location=new Point(x,y),Size=new Size(w,30),DropDownStyle=ComboBoxStyle.DropDownList,Font=Theme.Font(10),BackColor=Theme.Cream,ForeColor=Theme.Ink};c.Items.AddRange(options);c.SelectedIndex=0;return c;
@@ -127,6 +130,7 @@ namespace DeskBuddy {
    if(!DateTimeInput.TryValue(out due)){error="시간은 09:00 또는 18:30처럼 입력해주세요. (00:00~23:59)";return false;}
    if(EveToggle.Checked&&!AppClock.Time(EveTimeInput.Text,out eve)){error="전날 알림 시각도 18:00처럼 입력해주세요.";return false;}
    TimeSpan endTime;int duration=1440;if(!AllDayToggle.Checked){if(!AppClock.Time(EndTimeInput.Text,out endTime)){error="종료 시간은 15:30처럼 입력해주세요.";return false;}DateTime end=due.Date+endTime;if(EndNextDay.Checked)end=end.AddDays(1);if(end<=due){error="종료 시간은 시작 시간보다 늦어야 해요. 자정을 넘기면 다음날 종료를 켜주세요.";return false;}duration=(int)(end-due).TotalMinutes;}else due=due.Date;
+   if(RepeatInput.Text=="매주")due=due.AddDays((WeekdayInput.SelectedIndex-(int)due.DayOfWeek+7)%7);
    due=Scheduler.FirstAllowed(due,RepeatInput.Text);
    if(due.AddMinutes(duration)<=AppClock.Now&&(existing==null||due!=Scheduler.Due(existing))){error="현재보다 나중 날짜와 시각을 선택해주세요.";return false;}
    try{

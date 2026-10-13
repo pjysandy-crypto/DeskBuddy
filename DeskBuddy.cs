@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -32,7 +32,7 @@ namespace DeskBuddy {
   public List<string> RoomOwned=new List<string>{"기본 벽지","기본 러그","기본 장식"};
   public int Coins=30, Completed, FocusCount, FocusMinutes,ExperienceAdjustment; public int InteractionExperience;public string LastInteractionLocal="";
   public string DittoForm="";public string PetName="스누피", ImagePath="", Equipped="기본"; public int PixelSize=3; public int PetSize=140; public int BubbleScale=100; public int FocusTimerScale=100; public Dictionary<string,LittlePet> Companions=new Dictionary<string,LittlePet>();
-  public List<MemoNote> Memos=new List<MemoNote>(); public List<string> Owned=new List<string>{"기본"}; public List<TaskItem> Tasks=new List<TaskItem>();
+  public Dictionary<string,int> CompanionScales=new Dictionary<string,int>(); public List<MemoNote> Memos=new List<MemoNote>(); public List<string> Owned=new List<string>{"기본"}; public List<TaskItem> Tasks=new List<TaskItem>();
   public List<ProjectItem> Projects=new List<ProjectItem>(); public List<WorkDiaryItem> Diaries=new List<WorkDiaryItem>();
   public List<KpiItem> Kpis=new List<KpiItem>(); public List<MonthlyReport> MonthlyReports=new List<MonthlyReport>(); public string AiProvider="Claude"; public Dictionary<string,string> AiModels=new Dictionary<string,string>();
   public bool Wander=true, Quiet=false; public bool Cartwheels=true; public List<string> CharacterSamples=new List<string>(); public DateTime FocusEnd=DateTime.MinValue; public string FocusEndLocal=""; public int SessionMinutes; public string GamesDate=""; public int GamesPlayed;
@@ -44,6 +44,7 @@ namespace DeskBuddy {
    if(!File.Exists(FilePath))return;
    try { State=new JavaScriptSerializer().Deserialize<Data>(File.ReadAllText(FilePath,Encoding.UTF8));
     if(State==null || State.Tasks==null || State.Owned==null)throw new Exception("Invalid data");
+    if(State.ImagePath=="builtin:DeskBuddy.Character.tae_ch"&&State.PetName=="찌오")State.PetName="우사기";
     Scheduler.Normalize(State);Living.Normalize(State);StickyMemos.Normalize(State);DiaryCore.Normalize(State);State.FocusTimerScale=Math.Max(60,Math.Min(180,State.FocusTimerScale));State.BubbleScale=Math.Max(60,Math.Min(160,State.BubbleScale));if(State.Companions==null)State.Companions=new Dictionary<string,LittlePet>(); State.PixelSize=Math.Max(1,Math.Min(5,State.PixelSize));Store.State.PetSize=Math.Max(40,Math.Min(320,Store.State.PetSize));
    } catch { State=new Data(); Warning="저장 데이터를 읽지 못해 새 데이터를 사용합니다. 원본은 별도 파일로 보관합니다.";
     File.Copy(FilePath,FilePath+".damaged-"+AppClock.Now.ToString("yyyyMMddHHmmss"),true); }
@@ -251,7 +252,7 @@ namespace DeskBuddy {
   public Size PreviewSize{get{return PetWindowSize(true);}}
   public int MemoAvailable{get{return MemoBudget(false);}}
   int MemoBudget(bool preview){return Screen.FromControl(this).WorkingArea.Height-BubbleSpace-(preview?FocusTimerHeight:FocusTimerSpace)-Store.State.PetSize-8;}
-  Size PetWindowSize(bool preview=false){int little=Companions.Current(Store.State)==null?0:Companions.SizeFor(Store.State.PetSize);return new Size(Math.Max(StickyMemos.Pinned(Store.State).Count>0?266:0,Math.Max(14+(int)(266*Store.State.BubbleScale/100.0),Math.Max(Store.State.PetSize+little+40,(int)Math.Round(140*Store.State.FocusTimerScale/100.0)+14))),BubbleSpace+StickyMemos.Space(Store.State,MemoBudget(preview))+(preview?FocusTimerHeight:FocusTimerSpace)+Store.State.PetSize+8);}
+  Size PetWindowSize(bool preview=false){int little=Companions.Current(Store.State)==null?0:Companions.SizeFor(Store.State.PetSize,Store.State);return new Size(Math.Max(StickyMemos.Pinned(Store.State).Count>0?266:0,Math.Max(14+(int)(266*Store.State.BubbleScale/100.0),Math.Max(Store.State.PetSize+little+40,(int)Math.Round(140*Store.State.FocusTimerScale/100.0)+14))),BubbleSpace+StickyMemos.Space(Store.State,MemoBudget(preview))+(preview?FocusTimerHeight:FocusTimerSpace)+Store.State.PetSize+8);}
   public void ApplyPetSize(){
    int size=Math.Max(40,Math.Min(320,Store.State.PetSize));Store.State.PetSize=size;
    int bottom=Bottom,center=Left+Width/2;Size=PetWindowSize();
@@ -274,7 +275,7 @@ namespace DeskBuddy {
    if(Rules.FinishFocus(Store.State,now)){ApplyPetSize();Say("집중 완료! 코인을 받았어요.\n잠깐 스트레칭할까요?",true);changed=true;}
    CheckLevelUp();if(changed||careChanged){Store.Save();if(dashboard!=null && !dashboard.IsDisposed)dashboard.RefreshPage();}
    if(game==null && !Store.State.Quiet && now.Second==0 && now.Minute%30==0 && now.Hour>=9 && now.Hour<19 && Store.State.FocusEnd==DateTime.MinValue)
-    Say(random.Next(2)==0?"물 한 잔 마시고 올까요?":"어깨를 펴고 잠깐 쉬어요!",false);
+    Say(Companions.Key(Store.State).EndsWith("tae_ch",StringComparison.Ordinal)?new[]{"뿌릣","이야하","우 우나나 울라","울랄라 하야하"}[random.Next(4)]:random.Next(2)==0?"물 한 잔 마시고 올까요?":"어깨를 펴고 잠깐 쉬어요!",false);
   }
   protected override CreateParams CreateParams{get{var cp=base.CreateParams;cp.ExStyle|=0x80000;return cp;}}
   protected override void OnPaintBackground(PaintEventArgs e){}
@@ -292,10 +293,10 @@ namespace DeskBuddy {
    int memoSpace=StickyMemos.Space(Store.State,MemoBudget(preview));StickyMemos.Draw(graphics,Width,BubbleSpace,Store.State,MemoBudget(preview));
    int petTop=BubbleSpace+memoSpace+(preview?FocusTimerHeight:FocusTimerSpace);
    if(preview||Store.State.FocusEnd!=DateTime.MinValue)FocusTimerArt.Draw(graphics,new Rectangle((Width-(int)Math.Round(140*Store.State.FocusTimerScale/100.0))/2,BubbleSpace+memoSpace,(int)Math.Round(140*Store.State.FocusTimerScale/100.0),FocusTimerHeight-8),Store.State,AppClock.Now,preview);
-   var transform=graphics.Save();int size=Store.State.PetSize;int little=PetArt.CompanionPlayActive||Companions.Current(Store.State)==null?0:Companions.SizeFor(size);int mainX=(Width-size-little)/2;
+   var transform=graphics.Save();int size=Store.State.PetSize;int little=PetArt.CompanionPlayActive||Companions.Current(Store.State)==null?0:Companions.SizeFor(size,Store.State);int mainX=(Width-size-little)/2;
    if(actionFrames>0&&!PetArt.CompanionPlayActive){graphics.TranslateTransform(mainX+size/2f,petTop+size/2f);if(actionName=="공중제비"){double angle=(60-actionFrames)*Math.PI*2/60;graphics.RotateTransform((float)(angle*180/Math.PI));float fit=(float)(1/(Math.Abs(Math.Cos(angle))+Math.Abs(Math.Sin(angle))));graphics.ScaleTransform(fit,fit);}else{graphics.RotateTransform((float)Math.Sin(actionFrames*.35)*12);graphics.TranslateTransform(0,-Math.Abs((float)Math.Sin(actionFrames*.25))*8);}graphics.TranslateTransform(-mainX-size/2f,-petTop-size/2f);}
    if(cartwheelFrame>=0&&!PetArt.CompanionPlayActive){graphics.TranslateTransform(mainX+size/2f,petTop+size/2f);graphics.RotateTransform(direction*cartwheelFrame*360f/24);double angle=cartwheelFrame*Math.PI*2/24;float fit=(float)(1/(Math.Abs(Math.Cos(angle))+Math.Abs(Math.Sin(angle))));graphics.ScaleTransform(fit,fit);graphics.TranslateTransform(-mainX-size/2f,-petTop-size/2f);}
-   PetArt.Draw(graphics,new Rectangle(mainX,petTop+(frame/3%2),size,size),frame/3,direction<0,Progression.Accessory(Store.State));graphics.Restore(transform);Companions.Draw(graphics,new Rectangle(mainX+size+4,petTop+size-little-(actionFrames>0&&actionName=="함께 놀기"?(int)(Math.Abs(Math.Sin(actionFrames*.25))*8):0),little,little),Store.State,frame);Progression.Sparkles(graphics,new Rectangle(0,petTop,Width,size),frame,AppClock.Now<celebrationUntil);
+   PetArt.Draw(graphics,new Rectangle(mainX,petTop+(frame/3%2),size,size),frame/3,direction<0,Progression.Accessory(Store.State));graphics.Restore(transform);Companions.Draw(graphics,new Rectangle(mainX+size-Math.Max(2,size/10),petTop+size-little-(actionFrames>0&&actionName=="함께 놀기"?(int)(Math.Abs(Math.Sin(actionFrames*.25))*8):0),little,little),Store.State,frame);Progression.Sparkles(graphics,new Rectangle(0,petTop,Width,size),frame,AppClock.Now<celebrationUntil);
    DateTime fed=AppClock.Decode(Store.State.LastFedLocal,DateTime.MinValue);if(fed!=DateTime.MinValue&&AppClock.Now>=fed&&AppClock.Now<fed.AddSeconds(5))LivingArt.Food(graphics,Store.State.LastFood,new Rectangle(Width/2+size/4,petTop+size/2,Math.Max(24,size/3),Math.Max(24,size/3)));
   }
   protected override void Dispose(bool disposing){if(disposing){PetArt.ClearCompanionPlay();animation.Dispose();clock.Dispose();if(tray!=null){tray.Visible=false;tray.Dispose();tray=null;}}base.Dispose(disposing);}
@@ -391,7 +392,7 @@ namespace DeskBuddy {
      FindButton(f,"기본 캐릭터로 돌아가기").PerformClick();Application.DoEvents();
      if(Store.State.PetName!="스누피"||Store.State.ImagePath!="")throw new Exception("Default character name");
      var appearanceTask=new TaskItem{Id="selection-appearance",ScheduleImage=sample,LocalDue=AppClock.Encode(AppClock.Now),AppearanceMinutes=30};Store.State.Tasks.Add(appearanceTask);PetArt.SetScheduleImage(sample);
-     foreach(string name in new[]{"가나디","메타몽","루피","햄뿡이","찌오"}){FindButton(f,name).PerformClick();Application.DoEvents();if(Store.State.PetName!=name||CharacterLibrary.Label(Store.State.ImagePath)!=name||p.Text!="DeskBuddy · "+name||!Descendants(f).OfType<Label>().Any(l=>l.Text==name))throw new Exception("Bundled character name: "+name);typeof(PetForm).GetMethod("TickClock",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).Invoke(p,null);if(PetArt.ScheduleCustom!=null)throw new Exception("Schedule image overrides selected character");using(var expected=CharacterLibrary.Read(Store.State.ImagePath)){if(PetArt.Custom.Size!=expected.Size)throw new Exception("Selected character image size");for(int y=0;y<expected.Height;y++)for(int x=0;x<expected.Width;x++)if(PetArt.Custom.GetPixel(x,y)!=expected.GetPixel(x,y))throw new Exception("Selected character pixels");}}
+     foreach(string name in new[]{"가나디","메타몽","루피","햄뿡이","우사기"}){FindButton(f,name).PerformClick();Application.DoEvents();if(Store.State.PetName!=name||CharacterLibrary.Label(Store.State.ImagePath)!=name||p.Text!="DeskBuddy · "+name||!Descendants(f).OfType<Label>().Any(l=>l.Text==name))throw new Exception("Bundled character name: "+name);typeof(PetForm).GetMethod("TickClock",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).Invoke(p,null);if(PetArt.ScheduleCustom!=null)throw new Exception("Schedule image overrides selected character");using(var expected=CharacterLibrary.Read(Store.State.ImagePath)){if(PetArt.Custom.Size!=expected.Size)throw new Exception("Selected character image size");for(int y=0;y<expected.Height;y++)for(int x=0;x<expected.Width;x++)if(PetArt.Custom.GetPixel(x,y)!=expected.GetPixel(x,y))throw new Exception("Selected character pixels");}}
      Store.State.Tasks.Remove(appearanceTask);
      FindButton(f,"기본 캐릭터로 돌아가기").PerformClick();Application.DoEvents();
      p.Cartwheel();using(var start=p.RenderSnapshot()){
