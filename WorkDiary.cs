@@ -515,9 +515,9 @@ namespace DeskBuddy {
 			Controls.Add(lblTitle);
 			y += 36;
 
-			var lblSub = Theme.Label("오늘의 To-Do 달성률과 프로젝트별 업무 메모를 한 곳에서 기록하세요. [일지 작성 보상: +25 G · +15 EXP]", 14, y, CARD_WIDTH, 22, 9, Theme.Muted);
+			var lblSub = Theme.Label("오늘의 To-Do 달성률과 프로젝트별 업무 메모를 한 곳에서 기록하세요. [일지 작성 보상: +25 G · +15 EXP]", 14, y, CARD_WIDTH, 38, 9, Theme.Muted);
 			Controls.Add(lblSub);
-			y += 28;
+			y += 42;
 
 			// Mode Tabs
 			tabDaily = Theme.Button("일자별 일지 작성", 14, y, 160, 38, (s, e) => { mode = "daily"; RefreshMode(); });
@@ -617,7 +617,7 @@ namespace DeskBuddy {
 			// 1-1. Reward Status Notice Bar
 			var rewardBar = new PixelPanel {
 				Location = new Point(0, y),
-				Size = new Size(CARD_WIDTH, 42),
+				Size = new Size(CARD_WIDTH, 54),
 				BackColor = diary.Rewarded ? Color.FromArgb(236, 246, 238) : Color.FromArgb(255, 248, 230)
 			};
 			mainContent.Controls.Add(rewardBar);
@@ -625,10 +625,10 @@ namespace DeskBuddy {
 			string rewardMsg = diary.Rewarded
 				? "[보상 획득 완료] 이 날짜의 업무일지 작성 보상 (+25 G 코인 · +15 EXP 경험치)을 받았습니다!"
 				: "[일지 작성 보상] 오늘 업무일지(프로젝트 메모/일일 종합 메모)를 작성하면 +25 G와 +15 EXP가 지급됩니다!";
-			var lblRewardStatus = Theme.Label(rewardMsg, 14, 9, 640, 24, 9, diary.Rewarded ? Theme.Purple : Color.FromArgb(180, 110, 0));
+			var lblRewardStatus = Theme.Label(rewardMsg, 14, 8, 640, 38, 9, diary.Rewarded ? Theme.Purple : Color.FromArgb(180, 110, 0));
 			rewardBar.Controls.Add(lblRewardStatus);
 
-			y += 52;
+			y += 64;
 
 			// 2. Section 1: 오늘 할 일 To-Do 달성률
 			List<TaskItem> tasks;
@@ -754,7 +754,7 @@ namespace DeskBuddy {
 			var lblProjTitle = Theme.Label("[프로젝트별 Work Memo]", 14, 12, 320, 24, 11);
 			projCard.Controls.Add(lblProjTitle);
 
-			var lblProjSub = Theme.Label("프로젝트를 선택하고 [+ 메모 추가]를 누르면 프로젝트별로 정렬되어 기록됩니다.", 14, 36, 640, 20, 9, Theme.Muted);
+			var lblProjSub = Theme.Label("프로젝트를 선택하고 [+ 메모 추가]를 누르면 프로젝트별로 정렬되어 기록됩니다.", 14, 38, 640, 20, 9, Theme.Muted);
 			projCard.Controls.Add(lblProjSub);
 
 			// Select Bar for adding new project work memo
@@ -765,6 +765,13 @@ namespace DeskBuddy {
 
 			var cmbProgress = Choice(new[] { "진행 중", "30%", "50%", "80%", "완료", "이슈 해결", "검토 중" }, 212, 62, 105);
 			projCard.Controls.Add(cmbProgress);
+
+			var btnExportDaily = Theme.Button("내보내기", 554, 8, 100, 32, (s, e) => {
+				var pName = cmbProjects.SelectedItem != null ? cmbProjects.SelectedItem.ToString() : "";
+				var pObj = Store.State.Projects.FirstOrDefault(x => x.Name == pName);
+				OpenExportDialog(pObj, "excel");
+			}, true);
+			projCard.Controls.Add(btnExportDaily);
 
 			var btnAddMemo = Theme.Button("+ 메모 추가", 326, 61, 130, 36, (s, e) => {
 				string pName = cmbProjects.SelectedItem != null ? cmbProjects.SelectedItem.ToString() : "기본 프로젝트";
@@ -784,18 +791,11 @@ namespace DeskBuddy {
 			}, true);
 			projCard.Controls.Add(btnAddMemo);
 
-			var btnGoManage = Theme.Button("프로젝트 관리", 464, 61, 116, 36, (s, e) => {
+			var btnGoManage = Theme.Button("프로젝트 관리", 464, 61, 140, 36, (s, e) => {
 				mode = "manageProjects";
 				RefreshMode();
 			});
 			projCard.Controls.Add(btnGoManage);
-
-			var btnExportDaily = Theme.Button("내보내기", 588, 61, 66, 36, (s, e) => {
-				var pName = cmbProjects.SelectedItem != null ? cmbProjects.SelectedItem.ToString() : "";
-				var pObj = Store.State.Projects.FirstOrDefault(x => x.Name == pName);
-				OpenExportDialog(pObj, "excel");
-			});
-			projCard.Controls.Add(btnExportDaily);
 
 			// Render project groups (Grouped by Project!)
 			int groupY = 110;
